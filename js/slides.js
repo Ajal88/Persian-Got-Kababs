@@ -99,14 +99,14 @@
     id: 'hype', section: 'Before the bite', steps: 2,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
-      if (!a.hypeOrder.length) return head('Before the bite', 'The Hype Ranking') + empty('No first-survey results yet.');
+      if (!a.hypeOrder.length || a.hypeOrder.every((x) => x.avgRank == null)) return head('Before the bite', 'The Hype Ranking') + empty('No first-survey results yet.');
       const total = a.restaurants.length;
       const bestId = a.bestPerceived.map((x) => x.id), worstId = a.worstPerceived.map((x) => x.id);
       const rows = a.hypeOrder.map((x, i) => {
         const w = Math.max(6, ((total + 1 - x.avgRank) / total) * 100);
         const cls = bestId.includes(x.id) ? 'best' : worstId.includes(x.id) ? 'worst' : '';
         return `<div class="bar-row ${cls}" style="--i:${i}"><span class="rk">${i + 1}</span>${H.logo(x.id, 48)}<span class="bn">${nm(x.name)}</span>
-          <span class="track"><span class="bar" style="--w:${w}%"></span></span><span class="bv">${x.avgRank.toFixed(1)}</span></div>`;
+          <span class="track"><span class="bar" style="--w:${w}%"></span></span><span class="bv">${(x.avgRank == null ? '–' : x.avgRank.toFixed(1))}</span></div>`;
       }).join('');
       const b = a.bestPerceived[0], w = a.worstPerceived[0];
       return `${head('Before the bite', 'The <em>Hype</em> Ranking', 'Average position when guests ranked every restaurant (1 = best)')}
@@ -127,7 +127,7 @@
     id: 'popularity', section: 'Before the bite', steps: 6,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
-      if (!a.pre.length) return head('Before the bite', 'Popularity Contest') + empty('No first-survey results yet.');
+      if (!a.nPre || !a.mostDivisive.length || !a.mostFirstVotes.length) return head('Before the bite', 'Popularity Contest') + empty('No first-survey results yet.');
       const one = (arr) => arr[0];
       const fam = a.familiarity[0];
       const lp = one(a.leastPopular), mp = one(a.mostPopular);
