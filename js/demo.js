@@ -21,8 +21,8 @@
     // organisers get a different plate numbering (private mapping)
     const served = R.filter((r) => r.present);
     const nos = served.map((r) => r.kabab);
-    const perm = served.map((r) => r.id).reverse().map((id, i, a) => a[(i + 2) % a.length]);
-    const privateMap = Object.fromEntries(nos.map((n, i) => [n, perm[i]]));
+    const perm = nos.slice().reverse().map((n, i, a) => a[(i + 2) % a.length]);
+    const privateMap = Object.fromEntries(nos.map((n, i) => [n, perm[i]])); // their # -> our #
     const privNames = ['Amirabbas', 'Mina'];
     const raw1 = { restaurants: R.map((r) => r.name), rows: [] };
     const raw2 = { kababNos: [1, 2, 3, 4, 5, 6, 7], rows: [] };
@@ -36,7 +36,7 @@
         const k = {}; const priceBias = 0.7 + rand() * 0.8; const skill = rand();
         const isPriv = privNames.includes(nm);
         nos.forEach((no) => {
-          const r = isPriv ? R.find((x) => x.id === privateMap[no]) : R.find((x) => x.kabab === no);
+          const r = isPriv ? R.find((x) => x.kabab === privateMap[no]) : R.find((x) => x.kabab === no);
           let guess;
           const u = rand();
           if (u < 0.18 + skill * 0.3) guess = r.name;

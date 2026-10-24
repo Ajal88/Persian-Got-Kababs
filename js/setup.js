@@ -42,10 +42,9 @@
         const m = s.privateMap;
         if (!m || !Object.keys(m).length) errors.push('The private kabab numbering has not been entered yet. Use the "Private numbering" section to hand the computer to your friend.');
         else {
-          const ids = nos.map((n) => m[n]);
-          const served = new Set(pres.map((r) => r.id));
-          if (ids.some((x) => !x) || new Set(ids).size !== ids.length || ids.some((x) => !served.has(x)) || ids.length !== served.size) {
-            errors.push('The private numbering does not match the restaurants marked as served. Replace it (your friend must pick the same restaurants that are switched on above).');
+          const vals = nos.map((n) => m[n]);
+          if (vals.some((x) => x == null) || new Set(vals).size !== vals.length || vals.some((x) => !nos.includes(x))) {
+            errors.push('The private numbering is not a valid one-to-one match of the kabab numbers. Replace it.');
           }
         }
       }
@@ -106,7 +105,22 @@
   }
 
   /* ----- actions ----- */
+  async function loadKey(file) {
+    const msg = Setup.el.querySelector('#msg3'), s = Setup.state;
+    try {
+      const entries = P.parseKey(await P.readRows(file));
+      s.restaurants.forEach((r) => { r.present = false; r.kabab = null; });
+      entries.forEach((e) => {
+        let r = s.restaurants.find((x) => KA.normRestaurant(x.name) === KA.normRestaurant(e.name)) || KA.bestMatch(e.name, s.restaurants, 0.5);
+        if (!r) { r = { id: newId(), name: e.name, present: false, kabab: null, price: null }; s.restaurants.push(r); }
+        r.present = true; r.kabab = e.no; if (e.price != null) r.price = e.price;
+      });
+      s.keyFile = file.name; reconcileGuesses(); save(); render();
+    } catch (err) { if (msg) { msg.textContent = '⚠ ' + (err.message || err); msg.className = 'msg err'; } }
+  }
+
   async function loadSurvey(which, file) {
+    if (which === 3) return loadKey(file);
     const msg = Setup.el.querySelector(`#msg${which}`);
     try {
       const rows = await P.readRows(file);
@@ -156,7 +170,7 @@
     const has = s.privateMap && Object.keys(s.privateMap).length;
     return `<section class="card">
       <h3><span class="n">5</span> Private numbering <small>(for guests who must not know the real numbers)</small></h3>
-      <p class="help">The organisers can take part fairly: a friend gives them a <b>different</b> kabab numbering. Tick who uses it, then hand the computer to your friend. The next screen shows nothing you entered, and what your friend submits stays hidden here. Those guests' answers are then checked against <i>their</i> numbering.</p>
+      <p class="help">The organisers can take part fairly: a friend gives them a <b>different</b> kabab numbering. Tick who uses it, then hand the computer to your friend. Your friend only needs <b>their number → our number</b> (no restaurant names). The next screen shows nothing you entered, and what your friend submits stays hidden here. Those guests' answers are then checked against <i>their</i> numbering.</p>
       <div class="chk-grid">${people.map(([n, name]) => `<label class="chk"><input type="checkbox" data-priv="${esc(n)}" ${sel.has(n) ? 'checked' : ''}> ${esc(name)}</label>`).join('')}</div>
       <div class="priv-row">
         ${sel.size ? `<span class="pill ${has ? 'ok' : 'warn'}">${has ? '✓ Private numbering received (hidden)' : 'Waiting for your friend'}</span>
@@ -236,7 +250,8 @@
 
       ${s.restaurants.length ? `<section class="card">
         <h3><span class="n">3</span> Which restaurants were served?</h3>
-        <p class="help">Switch on the restaurants that were actually served, choose which kabab <b>number</b> each one was, and enter the price of its kabab. Anything switched off is a <b>decoy</b>. Click the “+” square to add a logo.</p>
+        <div class="key-up">${drop(3, 'Upload the key (optional)', 'Excel/CSV with 3 columns: kabab number · restaurant · price', s.keyFile, '.xlsx,.xls,.csv')}<div id="msg3" class="msg"></div></div>
+        <p class="help">…or fill it in by hand. Switch on the restaurants that were actually served, choose which kabab <b>number</b> each one was, and enter the price of its kabab. Anything switched off is a <b>decoy</b>. Click the “+” square to add a logo.</p>
         <table class="rest-table"><thead><tr><th></th><th>Restaurant</th><th>Served?</th><th>Kabab #</th><th>Price</th><th></th></tr></thead><tbody>${restRows}</tbody></table>
         <button class="btn ghost small" id="addRest">+ Add a restaurant</button>
       </section>` : ''}

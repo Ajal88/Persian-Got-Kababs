@@ -424,7 +424,13 @@
       const n = normName(row.name);
       return { pid: links[n] || n, name: String(row.name || '').trim(), k, priv: privSet.has(n) };
     }) : [];
-    const priv = setup.privateMap && Object.keys(setup.privateMap).length && privSet.size ? { map: setup.privateMap } : null;
+    // private map is "their number -> our number"; turn it into "their number -> restaurant id"
+    let priv = null;
+    if (setup.privateMap && Object.keys(setup.privateMap).length && privSet.size) {
+      const byNo = {}; R.forEach((r) => { if (r.present && r.kabab != null) byNo[r.kabab] = r.id; });
+      const map = {}; Object.keys(setup.privateMap).forEach((k) => { map[k] = byNo[setup.privateMap[k]] || null; });
+      priv = { map };
+    }
     return { restaurants: R, s1, s2, priv };
   }
 

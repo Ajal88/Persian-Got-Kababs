@@ -101,7 +101,7 @@
     setupEl.hidden = true; setupEl.innerHTML = ''; // nothing of the setup stays in the page
     friendEl.hidden = false; window.scrollTo(0, 0);
     const nos = st.raw2.kababNos;
-    window.KAFriend.open(friendEl, st.restaurants.map((r) => ({ id: r.id, name: r.name })), nos, (res) => {
+    window.KAFriend.open(friendEl, nos, (res) => {
       if (res && res !== true) { st.privateMap = res; Setup.save(); }
       if (res === true) { friendEl.hidden = true; friendEl.innerHTML = ''; setupEl.hidden = false; Setup.render(); window.scrollTo(0, 0); }
     });

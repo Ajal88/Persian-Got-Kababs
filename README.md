@@ -30,14 +30,23 @@ Each slide reveals its content in steps, and the last slide (the winner) is a tw
 
 ## Fair play for the organisers: private numbering
 
-Guests whose plates were numbered differently (Amirabbas and Mina) are ticked in the **Private numbering** section (names containing "Amirabbas" / "Mina" are pre-ticked). Then:
+Guests whose plates were numbered differently (Amirabbas and Mina) are ticked in the **Private numbering** section (names containing "Amirabbas" / "Mina" are pre-ticked). Your friend only needs to know **their number → our number**; restaurant names are never shown to them.
 
-1. Finish everything else on the setup page (restaurants, prices, …).
-2. Click **Hand over to your friend**. The page switches to a clean screen: it shows only the kabab numbers and the list of restaurant names (alphabetical, decoys included) — no results, prices, mapping or guesses. The setup page is removed from the page while it is open.
-3. Your friend picks, for each number, the restaurant it came from (each restaurant once), reviews it, and clicks **Lock it in**. Nothing is shown back.
-4. The setup page then only says "Private numbering received (hidden)". The slides score Amirabbas' and Mina's guesses against *their* numbering, and their ratings and prices count toward the restaurant they actually ate.
+1. Finish everything else on the setup page (survey files, restaurant key, prices).
+2. Click **Hand over to your friend**. The page switches to a clean screen showing only kabab numbers — no restaurant names, results, prices or guesses. The setup page is removed from the page while it is open.
+3. Your friend either picks, for each number on *their* plates, the matching number on *our* plates (each once), or uploads a 2-column Excel/CSV file (their number · our number). They review it and click **Lock it in**. Nothing is shown back.
+4. The setup page then only says "Private numbering received (hidden)". The app combines it with your key (our number → restaurant), scores Amirabbas' and Mina's guesses against *their* numbering, and counts their ratings and prices toward the restaurant they actually ate.
 
-The friend must choose from the same restaurants you switched on as "served"; otherwise the setup page refuses to start and asks to replace it. The private numbering is **not** included in "Save setup file", so a backup can't leak it. (If you reload the page mid-way, you land back on the setup page.)
+The private numbering is **not** included in "Save setup file", so a backup can't leak it. (If you reload the page mid-way, you land back on the setup page.)
+
+## Uploading everything straight into the app
+
+Everything is uploaded in the web page; nothing needs to be sent anywhere else, and no data leaves your computer.
+
+* Survey 1 and survey 2: the two Excel exports (section 2).
+* Restaurant key (optional, section 3): an Excel/CSV with columns `kabab number · restaurant · price`, e.g. `1, Persian Plate, 18`. Or fill the table by hand.
+* Private numbering: typed by your friend, or an Excel/CSV with `their number · our number`.
+* Pictures and logos: the labelled upload boxes.
 
 ## The 10 slides
 

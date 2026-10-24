@@ -336,3 +336,7 @@ h1 { font-family: var(--serif); font-weight: 900; font-size: 148px; line-height:
 .pricetag { font-size: 24px; font-weight: 700; color: var(--gold); text-align: center; padding: 3px 0; border-radius: 99px; background: rgba(246, 196, 83, .12); border: 1px solid rgba(246, 196, 83, .35); }
 .bar-row.val .bv small { display: inline; font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 6px; }
 .bar-row.val .bv { font-size: 28px; white-space: nowrap; }
+.key-up { margin-bottom: 16px; } .key-up .drop { padding: 18px; grid-template-columns: auto 1fr; justify-items: start; text-align: left; column-gap: 16px; } .key-up .drop-ico { grid-row: span 2; width: 44px; height: 44px; font-size: 20px; }
+.friend-up { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; } .friend-up small { color: var(--dim); } .friend-up .msg { flex-basis: 100%; margin: 0; }
+.friend-row { grid-template-columns: 70px 70px 1fr; } .friend-row .arr { color: var(--muted); }
+.friend-confirm div { font-size: 22px; } .friend-confirm .o { color: var(--gold); }

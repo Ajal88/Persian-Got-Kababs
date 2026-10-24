@@ -79,5 +79,33 @@
     return { kababNos, rows: out };
   }
 
-  root.KAParse = { readRows, parseSurvey1, parseSurvey2 };
+  /** Key file: rows of  kabab number | restaurant | price  (header optional, columns found by type). */
+  function parseKey(rows) {
+    const out = [];
+    rows.forEach((r) => {
+      const cells = r.filter((c) => c !== null && String(c).trim() !== '');
+      const no = cells.find((c) => KA.toNumber(c) != null && /^[\s#]*[0-9۰-۹٠-٩]+[\s.]*$/.test(String(c)));
+      const nameCell = cells.find((c) => typeof c === 'string' && KA.toNumber(c) == null);
+      if (no == null || !nameCell) return;
+      const after = cells.slice(cells.indexOf(nameCell) + 1).find((c) => KA.toNumber(c) != null);
+      const before = cells.slice(0, cells.indexOf(nameCell)).filter((c) => KA.toNumber(c) != null);
+      const price = after != null ? KA.toNumber(after) : (before.length > 1 ? KA.toNumber(before[1]) : null);
+      out.push({ no: KA.toNumber(no), name: String(nameCell).trim(), price });
+    });
+    if (!out.length) throw new Error('Could not read the key. Expected columns: kabab number, restaurant, price.');
+    return out;
+  }
+
+  /** Two columns of integers: their number | our number. */
+  function parseNumberPairs(rows) {
+    const out = [];
+    rows.forEach((r) => {
+      const n = r.map((c) => (typeof c === 'number' ? c : (/^[\s#]*[0-9۰-۹٠-٩]+\s*$/.test(String(c == null ? '' : c)) ? KA.toNumber(c) : null))).filter((x) => x != null);
+      if (n.length >= 2) out.push([n[0], n[1]]);
+    });
+    if (!out.length) throw new Error('Could not find number pairs. Expected two columns: your number, our number.');
+    return out;
+  }
+
+  root.KAParse = { readRows, parseSurvey1, parseSurvey2, parseKey, parseNumberPairs };
 })(window);
