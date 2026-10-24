@@ -17,8 +17,7 @@
     };
   }
 
-  let saveT = null;
-  function save() { clearTimeout(saveT); saveT = setTimeout(() => Store.set('state', Setup.state), 250); }
+  function save() { return Store.set('state', Setup.state); }
 
   /* ----- derived info ----- */
   function kababNos() { return Setup.state.raw2 ? Setup.state.raw2.kababNos : []; }
