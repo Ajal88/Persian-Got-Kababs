@@ -95,6 +95,17 @@
     Setup.render(); location.hash = '';
     window.scrollTo(0, 0);
   }
+  function openFriend() {
+    const st = Setup.state;
+    const friendEl = $('#friend');
+    setupEl.hidden = true; setupEl.innerHTML = ''; // nothing of the setup stays in the page
+    friendEl.hidden = false; window.scrollTo(0, 0);
+    const nos = st.raw2.kababNos;
+    window.KAFriend.open(friendEl, st.restaurants.map((r) => ({ id: r.id, name: r.name })), nos, (res) => {
+      if (res && res !== true) { st.privateMap = res; Setup.save(); }
+      if (res === true) { friendEl.hidden = true; friendEl.innerHTML = ''; setupEl.hidden = false; Setup.render(); window.scrollTo(0, 0); }
+    });
+  }
   function toggleFs() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
   function wakeUi() { presEl.classList.add('ui'); clearTimeout(hideTimer); hideTimer = setTimeout(() => presEl.classList.remove('ui'), 2500); }
 
@@ -121,7 +132,7 @@
   presEl.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
   presEl.addEventListener('touchend', (e) => { if (tx == null) return; const dx = e.changedTouches[0].clientX - tx; tx = null; if (Math.abs(dx) > 50) (dx < 0 ? next : prev)(); });
 
-  Setup.init(setupEl, openPresent).then(() => {
+  Setup.init(setupEl, openPresent, openFriend).then(() => {
     if (location.hash === '#present' && Setup.validate().errors.length === 0) openPresent();
     document.body.classList.add('ready');
   });

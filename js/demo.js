@@ -14,10 +14,16 @@
     ].map((r, i) => ({ id: 'r' + (i + 1), name: r[0], present: !!r[1], kabab: r[1], price: r[1] ? r[2] : null, hype: r[3], quality: r[4] }));
 
     const names = ['Sara', 'Ali', 'Reza', 'Nazanin', 'Kian', 'Mina', 'Arash', 'Leila', 'Dara', 'Shirin', 'Babak', 'Parisa', 'Omid', 'Yasaman', 'Farhad',
-      'Niloofar', 'بوز', 'Sina', 'Mahsa', 'Pouya', 'Taraneh', 'Hamed', 'Roya', 'Navid', 'Elham', 'Soheil'];
+      'Niloofar', 'Amirabbas', 'بوز', 'Sina', 'Mahsa', 'Pouya', 'Taraneh', 'Hamed', 'Roya', 'Navid', 'Elham', 'Soheil'];
     const gauss = () => (rand() + rand() + rand() - 1.5) * 1.4;
     const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
+    // organisers get a different plate numbering (private mapping)
+    const served = R.filter((r) => r.present);
+    const nos = served.map((r) => r.kabab);
+    const perm = served.map((r) => r.id).reverse().map((id, i, a) => a[(i + 2) % a.length]);
+    const privateMap = Object.fromEntries(nos.map((n, i) => [n, perm[i]]));
+    const privNames = ['Amirabbas', 'Mina'];
     const raw1 = { restaurants: R.map((r) => r.name), rows: [] };
     const raw2 = { kababNos: [1, 2, 3, 4, 5, 6, 7], rows: [] };
     names.forEach((nm, pi) => {
@@ -28,7 +34,9 @@
 
       if (rand() < 0.92) {
         const k = {}; const priceBias = 0.7 + rand() * 0.8; const skill = rand();
-        R.filter((r) => r.present).forEach((r) => {
+        const isPriv = privNames.includes(nm);
+        nos.forEach((no) => {
+          const r = isPriv ? R.find((x) => x.id === privateMap[no]) : R.find((x) => x.kabab === no);
           let guess;
           const u = rand();
           if (u < 0.18 + skill * 0.3) guess = r.name;
@@ -36,12 +44,12 @@
           else guess = r.id === 'r9' ? 'Kabob Land' : (rand() < .5 ? 'Caspian Kabob' : 'Pardis Kabob Cuisine');
           const rating = rand() < 0.97 ? clamp(Math.round(r.quality + gauss() * 1.9), 1, 10) : null;
           const price = Math.max(1, Math.round(r.price * priceBias * (0.65 + rand() * 0.7)));
-          k[r.kabab] = { guess, rating, price };
+          k[no] = { guess, rating, price };
         });
         raw2.rows.push({ name: nm, ts: pi, k });
       }
     });
-    const setup = { restaurants: R.map(({ id, name, present, kabab, price }) => ({ id, name, present, kabab, price })), nameAliases: {}, personLinks: {} };
+    const setup = { restaurants: R.map(({ id, name, present, kabab, price }) => ({ id, name, present, kabab, price })), nameAliases: {}, personLinks: {}, privateGuests: ['amirabbas', 'mina'], privateMap };
     // apply fuzzy aliases the way the app does
     const cands = setup.restaurants;
     const seen = new Set();

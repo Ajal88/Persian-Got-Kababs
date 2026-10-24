@@ -13,6 +13,7 @@
       cfg: { title: 'Persian Kabab Showdown', subtitle: 'Ten restaurants. Seven kababs. No labels. Zero mercy.', date: '', currency: '$' },
       raw1: null, raw2: null, file1: '', file2: '',
       restaurants: [], nameAliases: {}, personLinks: {}, images: {},
+      privateGuests: null, privateMap: null,
     };
   }
 
@@ -36,6 +37,18 @@
       });
       pres.forEach((r) => { if (r.kabab == null) errors.push(`${r.name} is marked as served but has no kabab number.`); else if (!nos.includes(r.kabab)) errors.push(`${r.name} has kabab #${r.kabab}, which is not in the survey.`); });
       pres.forEach((r) => { if (r.price == null) warns.push(`${r.name} has no price — price slides will be incomplete.`); });
+      const pg = s.privateGuests || [];
+      if (pg.length) {
+        const m = s.privateMap;
+        if (!m || !Object.keys(m).length) errors.push('The private kabab numbering has not been entered yet. Use the "Private numbering" section to hand the computer to your friend.');
+        else {
+          const ids = nos.map((n) => m[n]);
+          const served = new Set(pres.map((r) => r.id));
+          if (ids.some((x) => !x) || new Set(ids).size !== ids.length || ids.some((x) => !served.has(x)) || ids.length !== served.size) {
+            errors.push('The private numbering does not match the restaurants marked as served. Replace it (your friend must pick the same restaurants that are switched on above).');
+          }
+        }
+      }
     }
     return { errors, warns };
   }
@@ -68,6 +81,12 @@
     });
   }
 
+  function suggestPrivate() {
+    const s = Setup.state; if (!s.raw2 || s.privateGuests) return;
+    const names = [...new Set(s.raw2.rows.map((r) => KA.normName(r.name)))];
+    s.privateGuests = names.filter((n) => /^(amir ?abbas|amirabas|mina|امیر ?عباس|مینا)\b/.test(n));
+  }
+
   function linkPeople() {
     const s = Setup.state; if (!s.raw1 || !s.raw2) return;
     const s1 = new Map(); s.raw1.rows.forEach((r) => s1.set(KA.normName(r.name), r.name));
@@ -94,7 +113,7 @@
       const s = Setup.state;
       if (which === 1) { s.raw1 = P.parseSurvey1(rows); s.file1 = file.name; syncRestaurants(); }
       else { s.raw2 = P.parseSurvey2(rows); s.file2 = file.name; }
-      reconcileGuesses(); linkPeople(); save(); render();
+      reconcileGuesses(); linkPeople(); suggestPrivate(); save(); render();
     } catch (e) {
       if (msg) { msg.textContent = '⚠ ' + (e.message || e); msg.className = 'msg err'; }
     }
@@ -109,6 +128,7 @@
     const s = Setup.state;
     s.raw1 = raw1; s.raw2 = raw2; s.file1 = 'demo data'; s.file2 = 'demo data';
     s.restaurants = setup.restaurants.map((r) => ({ ...r })); s.nameAliases = {}; s.personLinks = {};
+    s.privateGuests = setup.privateGuests; s.privateMap = setup.privateMap;
     reconcileGuesses(); linkPeople(); save(); render();
   }
 
@@ -127,6 +147,22 @@
       <label class="imgbox-drop" data-drop="img:${key}"><input type="file" accept="image/*" data-img="${key}" hidden>
         ${src ? `<img src="${src}" alt="">` : '<span class="plus">+</span>'}</label>
       <div class="imgbox-t"><b>${esc(label)}</b><small>${esc(hint || '')}</small>${src ? `<button class="link" data-rmimg="${key}">remove</button>` : ''}</div></div>`;
+  }
+
+  function privateSection() {
+    const s = Setup.state;
+    const people = [...new Map(s.raw2.rows.map((r) => [KA.normName(r.name), r.name])).entries()];
+    const sel = new Set(s.privateGuests || []);
+    const has = s.privateMap && Object.keys(s.privateMap).length;
+    return `<section class="card">
+      <h3><span class="n">5</span> Private numbering <small>(for guests who must not know the real numbers)</small></h3>
+      <p class="help">The organisers can take part fairly: a friend gives them a <b>different</b> kabab numbering. Tick who uses it, then hand the computer to your friend. The next screen shows nothing you entered, and what your friend submits stays hidden here. Those guests' answers are then checked against <i>their</i> numbering.</p>
+      <div class="chk-grid">${people.map(([n, name]) => `<label class="chk"><input type="checkbox" data-priv="${esc(n)}" ${sel.has(n) ? 'checked' : ''}> ${esc(name)}</label>`).join('')}</div>
+      <div class="priv-row">
+        ${sel.size ? `<span class="pill ${has ? 'ok' : 'warn'}">${has ? '✓ Private numbering received (hidden)' : 'Waiting for your friend'}</span>
+        <button class="btn ${has ? 'ghost' : 'primary'} small" id="friendBtn">${has ? 'Replace it' : '🙈 Hand over to your friend'}</button>` : '<span class="help">Nobody selected — everyone uses the main numbering.</span>'}
+      </div>
+    </section>`;
   }
 
   function render() {
@@ -211,8 +247,10 @@
         ${personRows ? `<h4>Guests in survey 2 whose name was not found in survey 1</h4><table class="map">${personRows}</table>` : ''}
       </section>` : ''}
 
+      ${s.raw2 && s.restaurants.length ? privateSection() : ''}
+
       ${nos.length ? `<section class="card">
-        <h3><span class="n">5</span> Kabab pictures <small>(optional, for the winner reveal)</small></h3>
+        <h3><span class="n">6</span> Kabab pictures <small>(optional, for the winner reveal)</small></h3>
         <div class="imgrow wrap">${nos.map((n) => imgBox('kabab-' + n, 'Kabab #' + n, 'Photo of this plate')).join('')}</div>
       </section>` : ''}
 
@@ -239,6 +277,7 @@
       if (t.dataset.file) { if (t.files[0]) loadSurvey(+t.dataset.file, t.files[0]); return; }
       if (t.dataset.img) { if (t.files[0]) setImage(t.dataset.img, t.files[0]); return; }
       if (t.dataset.cfg) { s.cfg[t.dataset.cfg] = t.value; save(); if (t.dataset.cfg === 'currency') render(); return; }
+      if (t.dataset.priv) { const set = new Set(s.privateGuests || []); if (t.checked) set.add(t.dataset.priv); else set.delete(t.dataset.priv); s.privateGuests = [...set]; save(); render(); return; }
       if (t.dataset.alias) { s.nameAliases[t.dataset.alias] = t.value; save(); return; }
       if (t.dataset.person) { s.personLinks[t.dataset.person] = t.value || null; save(); render(); return; }
       if (t.id === 'import') { importSetup(t.files[0]); return; }
@@ -260,6 +299,7 @@
       const s = Setup.state;
       if (t.id === 'start' && !t.disabled) { save(); Setup.onStart(); }
       else if (t.id === 'demo') loadDemo();
+      else if (t.id === 'friendBtn') { save(); Setup.onFriend(); }
       else if (t.id === 'addRest') { s.restaurants.push({ id: newId(), name: 'New restaurant', present: false, kabab: null, price: null }); save(); render(); }
       else if (t.dataset.rm) { s.restaurants = s.restaurants.filter((r) => r.id !== t.dataset.rm); save(); render(); }
       else if (t.dataset.rmimg) { delete s.images[t.dataset.rmimg]; save(); render(); e.preventDefault(); }
@@ -278,22 +318,24 @@
   }
 
   function exportSetup() {
-    const blob = new Blob([JSON.stringify(Setup.state)], { type: 'application/json' });
+    const copy = Object.assign({}, Setup.state, { privateMap: null }); // keep the private numbering secret
+    const blob = new Blob([JSON.stringify(copy)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'kabab-showdown-setup.json'; a.click();
   }
   function importSetup(file) {
     if (!file) return;
-    file.text().then((t) => { try { Setup.state = Object.assign(blank(), JSON.parse(t)); save(); render(); } catch (e) { alert('That file is not a valid setup file.'); } });
+    file.text().then((t) => { try { Setup.state = Object.assign(blank(), JSON.parse(t), { privateMap: Setup.state.privateMap }); save(); render(); } catch (e) { alert('That file is not a valid setup file.'); } });
   }
 
-  Setup.init = async function (el, onStart) {
-    Setup.el = el; Setup.onStart = onStart;
+  Setup.init = async function (el, onStart, onFriend) {
+    Setup.el = el; Setup.onStart = onStart; Setup.onFriend = onFriend;
     const saved = await Store.get('state');
     Setup.state = Object.assign(blank(), saved || {});
     Setup.state.cfg = Object.assign(blank().cfg, Setup.state.cfg);
     bind(); render();
   };
   Setup.render = render;
+  Setup.save = () => Store.set('state', Setup.state);
   Setup.validate = validate;
   Setup.resolved = () => { const s = Setup.state; return KA.resolve(s.raw1, s.raw2, s); };
   root.KASetup = Setup;

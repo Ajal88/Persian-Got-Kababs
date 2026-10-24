@@ -144,39 +144,45 @@
     },
   });
 
-  /* 4 — The blind test: accuracy & decoys */
+  /* 4 — The blind test: accuracy, decoys & mistaken identity */
   slides.push({
-    id: 'blind', section: 'The blind test', steps: 3,
+    id: 'blind', section: 'The blind test', steps: null,
+    stepCount: (a) => a.kabs.length + 2,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
-      if (!a.totalGuesses) return head('The blind test', 'Detective Work') + empty('No second-survey results yet.');
-      const acc = a.overallAccuracy, chance = a.chance;
-      const circ = 2 * Math.PI * 150;
-      const max = Math.max(...a.guessRows.map((x) => x.n), 1);
-      const rows = a.guessRows.slice().sort((x, y) => y.n - x.n).map((x, i) => `
-        <div class="bar-row ${x.present ? '' : 'decoy'}" style="--i:${i}">${H.logo(x.id, 44)}<span class="bn">${nm(x.name)}${x.present ? '' : '<em class="tag decoy-tag">DECOY</em>'}</span>
-        <span class="track"><span class="bar" style="--w:${Math.max(2, (x.n / max) * 100)}%"></span></span><span class="bv">${x.n}</span></div>`).join('');
-      const fooled = a.decoyFooled[0];
-      return `${head('The blind test', 'Detective <em>Work</em>', `${plural(a.totalGuesses, 'guess', 'guesses')} from ${plural(a.nPost, 'guest')} on ${plural(a.present.length, 'unlabelled kabab')}`)}
-      <div class="split blind">
+      if (!a.totalGuesses || !a.kabs.length) return head('The blind test', 'Mistaken Identity') + empty('No second-survey results yet.');
+      const K = a.kabs.length; const rowH = Math.min(78, Math.floor(480 / K));
+      const acc = a.overallAccuracy, chance = a.chance, circ = 2 * Math.PI * 150;
+      const rows = a.kabs.map((k, i) => `
+        <div class="id-row" data-step="${i + 1}" style="--rh:${rowH}px">
+          <span class="kno">#${k.kabab}</span>
+          <span class="id-real">${H.logo(k.id, rowH - 20)}<span><small>It was</small>${nm(k.name)}</span></span>
+          <span class="id-guess"><small>Crowd's top guess</small>${k.topGuess ? `<span class="gn">${nm(k.topGuess.name)} <em>${k.topGuess.n}×</em></span>` : '–'}</span>
+          <span class="id-acc"><span class="track"><span class="bar" style="--w:${Math.max(2, (k.accuracy || 0) * 100)}%"></span></span><b>${pct(k.accuracy)}</b></span>
+          <span class="id-mark ${k.crowdRight ? 'ok' : 'no'}">${k.crowdRight ? '✓' : '✗'}</span>
+        </div>`).join('');
+      const hd = a.hardest[0], ez = a.easiest[0], mx = a.biggestMixup, fooled = a.decoyFooled[0];
+      return `${head('The blind test', 'Mistaken <em>Identity</em>', `${plural(a.totalGuesses, 'guess', 'guesses')} from ${plural(a.nPost, 'guest')} — the real restaurant behind each number`)}
+      <div class="split ident">
+        <div class="id-table">${rows}</div>
         <div class="gauge-col">
-          <div class="gauge">
+          <div class="gauge sm">
             <svg viewBox="0 0 360 360"><circle class="g-bg" cx="180" cy="180" r="150"/>
               <circle class="g-fg" cx="180" cy="180" r="150" style="--c:${circ};--o:${circ * (1 - acc)}"/>
               <g transform="rotate(${chance * 360 - 90} 180 180)"><line class="g-mark" x1="318" y1="180" x2="348" y2="180"/></g></svg>
             <div class="g-txt"><b data-count="${Math.round(acc * 100)}" data-suffix="%">0%</b><span>identified correctly</span></div>
           </div>
-          <div class="g-note">Random guessing would score <b>${pct(chance)}</b> <i class="mk"></i></div>
-          <div class="chips">
-            <div class="chip" data-step="2"><b>${pct(a.decoyShare)}</b> of guesses were for <b>decoys</b> that were never served</div>
-            <div class="chip" data-step="3"><b>${a.crowdWisdomRight}/${a.present.length}</b> kababs were named correctly by majority vote</div>
+          <div class="g-note">Random guessing: <b>${pct(chance)}</b> <i class="mk"></i></div>
+          <div class="chips" data-step="${K + 1}">
+            <div class="chip">🕵️ <b>${pct(a.decoyShare)}</b> of guesses named a <b>decoy</b>${fooled && fooled.n ? ` — <b>${nm(fooled.name)}</b> fooled ${fooled.n}×` : ''}</div>
+            <div class="chip">🧠 Majority vote named <b>${a.crowdWisdomRight}/${a.present.length}</b> kababs correctly</div>
           </div>
         </div>
-        <div class="chart bars decoys-chart">
-          <div class="chart-title">Who did guests <em>think</em> they were eating?</div>
-          ${rows}
-          <div class="callout" data-step="1">🕵️ ${a.decoys.length} of these ${a.restaurants.length} were <b>decoys</b>${fooled && fooled.n ? ` — <b>${nm(fooled.name)}</b> fooled the most people (${fooled.n}×)` : ''}</div>
-        </div>
+      </div>
+      <div class="chips wide" data-step="${K + 2}">
+        ${hd ? `<div class="chip"><span>🫥 Hardest to spot</span><b>${list(a.hardest.slice(0, 2))}</b><i>${pct(hd.accuracy)} got it</i></div>` : ''}
+        ${ez ? `<div class="chip"><span>🎯 Easiest to spot</span><b>${list(a.easiest.slice(0, 2))}</b><i>${pct(ez.accuracy)} got it</i></div>` : ''}
+        ${mx ? `<div class="chip"><span>🎭 Biggest mix-up</span><b>${plural(mx.n, 'guest')} thought #${mx.kabab} was ${nm(mx.guess)}</b><i>it was ${nm(mx.truth)}</i></div>` : ''}
       </div>`;
     },
   });
@@ -212,32 +218,6 @@
           <div class="podium-title" data-step="3">🎯 Most accurate guests</div>
           <div class="podium">${pod}</div>
         </div>
-      </div>`;
-    },
-  });
-
-  /* 6 — Mistaken identity */
-  slides.push({
-    id: 'identity', section: 'The blind test', steps: 8,
-    render(a, ctx) {
-      const H = ctxHelpers(a, ctx);
-      if (!a.kabs.length) return head('The blind test', 'Mistaken Identity') + empty('No kabab data yet.');
-      const K = a.kabs.length; const rowH = Math.min(84, Math.floor(540 / K));
-      const rows = a.kabs.map((k, i) => `
-        <div class="id-row" data-step="${i + 1}" style="--rh:${rowH}px">
-          <span class="kno">#${k.kabab}</span>
-          <span class="id-real">${H.logo(k.id, rowH - 24)}<span><small>It was</small>${nm(k.name)}</span></span>
-          <span class="id-guess"><small>Crowd's top guess</small>${k.topGuess ? `<span class="gn">${nm(k.topGuess.name)} <em>${k.topGuess.n}×</em></span>` : '–'}</span>
-          <span class="id-acc"><span class="track"><span class="bar" style="--w:${Math.max(2, (k.accuracy || 0) * 100)}%"></span></span><b>${pct(k.accuracy)}</b></span>
-          <span class="id-mark ${k.crowdRight ? 'ok' : 'no'}">${k.crowdRight ? '✓' : '✗'}</span>
-        </div>`).join('');
-      const hd = a.hardest[0], ez = a.easiest[0], mx = a.biggestMixup;
-      return `${head('The blind test', 'Mistaken <em>Identity</em>', 'The real restaurant behind each number — and how many guests spotted it')}
-      <div class="id-table">${rows}</div>
-      <div class="chips wide" data-step="${K + 1}">
-        ${hd ? `<div class="chip"><span>🫥 Hardest to spot</span><b>${list(a.hardest.slice(0, 2))}</b><i>${pct(hd.accuracy)} got it</i></div>` : ''}
-        ${ez ? `<div class="chip"><span>🎯 Easiest to spot</span><b>${list(a.easiest.slice(0, 2))}</b><i>${pct(ez.accuracy)} got it</i></div>` : ''}
-        ${mx ? `<div class="chip"><span>🎭 Biggest mix-up</span><b>${plural(mx.n, 'guest')} thought #${mx.kabab} was ${nm(mx.guess)}</b><i>it was ${nm(mx.truth)}</i></div>` : ''}
       </div>`;
     },
   });
@@ -303,6 +283,36 @@
         ${card('📈 Most underrated', a.mostUnderrated, 4, 'gold', (e) => `Blind scores beat the reputation by <b>${sgn(e.gap)}</b> points${e.nPaired ? ` (${plural(e.nPaired, 'guest')} rated both)` : ''}`)}
       </div>
       <div class="strip" data-step="5">${strip.join('')}</div>`;
+    },
+  });
+
+  /* 8 — Bang for the buck */
+  slides.push({
+    id: 'value', section: 'The verdict', steps: 3,
+    render(a, ctx) {
+      const H = ctxHelpers(a, ctx);
+      const vs = a.valueOrder;
+      if (vs.length < 2) return head('The verdict', 'Bang for the Buck') + empty('Needs prices and ratings.');
+      const max = vs[0].value;
+      const bestId = a.valueKing.map((k) => k.id), worstId = a.valueWorst.map((k) => k.id);
+      const rows = vs.map((k, i) => `<div class="bar-row val ${bestId.includes(k.id) ? 'best' : worstId.includes(k.id) ? 'worst' : ''}" style="--i:${i}">
+        <span class="rk">${i + 1}</span>${H.logo(k.id, 48)}<span class="bn">${nm(k.name)}</span><span class="pricetag">${H.money(k.actualPrice)}</span>
+        <span class="track"><span class="bar" style="--w:${Math.max(5, (k.value / max) * 100)}%"></span></span>
+        <span class="bv">${k.value.toFixed(2)}<small>pts per ${esc(ctx.cfg.currency)}</small></span></div>`).join('');
+      const b = a.valueKing[0], w = a.valueWorst[0];
+      const c = a.priceRatingCorr;
+      const link = c == null ? '' : Math.abs(c) < 0.3 ? 'barely related' : c > 0 ? 'linked: you mostly <b>got what you paid for</b>' : 'inversely linked: <b>the pricier the kabab, the lower the score</b>';
+      return `${head('The verdict', 'Bang for the <em>Buck</em>', 'Taste points earned per dollar of menu price (higher = better value)')}
+      <div class="split value">
+        <div class="col-awards">
+          ${award(H, { kicker: '🪙 Worst bang for the buck', items: a.valueWorst, tone: 'bad', step: 1,
+            stat: `<b>${w.value.toFixed(2)}</b> points per ${esc(ctx.cfg.currency)}`, note: `${H.money(w.actualPrice)} a kabab · <b>${H.money(w.actualPrice / (w.avgRating || 1))}</b> for every taste point` })}
+          ${award(H, { kicker: '💰 Best bang for the buck', items: a.valueKing, tone: 'gold', step: 2,
+            stat: `<b>${b.value.toFixed(2)}</b> points per ${esc(ctx.cfg.currency)}`, note: `${H.money(b.actualPrice)} a kabab · <b>${H.money(b.actualPrice / (b.avgRating || 1))}</b> for every taste point` })}
+        </div>
+        <div class="chart bars value-chart">${rows}
+          ${link ? `<div class="fine" data-step="3">💸 Price tag vs. taste score: ${link} <small>(correlation ${f2(c)})</small></div>` : ''}</div>
+      </div>`;
     },
   });
 

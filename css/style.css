@@ -305,3 +305,34 @@ h1 { font-family: var(--serif); font-weight: 900; font-size: 148px; line-height:
 #present.ui #dots { opacity: 1; }
 #dots button { width: 10px; height: 10px; border-radius: 50%; border: 0; padding: 0; background: rgba(255, 244, 224, .3); } #dots button.cur { background: var(--ember); transform: scale(1.5); }
 #progress { position: fixed; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, .05); z-index: 50; } #progress i { display: block; height: 100%; width: 0; background: var(--grad); transition: width .5s; }
+
+/* ===== friend mode & private numbering ===== */
+.chk-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.chk { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 99px; background: #120c09; border: 1px solid var(--line); font-size: 14px; cursor: pointer; }
+.chk input { accent-color: var(--ember); }
+.priv-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+#friend { min-height: 100vh; display: grid; place-items: center; padding: 40px 20px; background: radial-gradient(900px 500px at 50% -10%, rgba(45, 212, 191, .12), transparent 60%), var(--bg); }
+.friend-wrap { width: min(640px, 100%); }
+.friend-wrap.center { text-align: center; }
+.friend-wrap h1 { font-size: 44px; margin: 14px 0 6px; line-height: 1.1; }
+.friend-wrap h1 em { font-style: italic; -webkit-text-fill-color: initial; }
+.friend-wrap .lead { color: var(--muted); font-size: 18px; line-height: 1.55; margin: 0 0 24px; }
+.friend-rows { display: grid; gap: 10px; }
+.friend-row { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 16px; }
+.friend-row .kno { font-size: 34px; }
+.friend-actions { display: flex; gap: 14px; justify-content: flex-end; margin-top: 24px; }
+.friend-confirm { display: grid; gap: 8px; }
+.friend-confirm div { display: grid; grid-template-columns: 70px 1fr; align-items: center; padding: 12px 18px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 20px; }
+.friend-confirm b { font-family: var(--serif); color: var(--ember); font-size: 26px; }
+
+/* ===== merged blind slide & value slide ===== */
+.split.ident { grid-template-columns: 1fr 480px; gap: 36px; }
+.split.ident .id-row { grid-template-columns: 80px 400px 330px 1fr 44px; gap: 16px; padding: 0 20px; }
+.split.ident .kno { font-size: 40px; } .split.ident .id-real, .split.ident .id-guess { font-size: 27px; } .split.ident .id-acc b { font-size: 25px; width: 66px; } .split.ident .id-mark { font-size: 32px; }
+.gauge.sm { width: 290px; height: 290px; } .gauge.sm .g-txt b { font-size: 78px; } .gauge.sm .g-txt span { font-size: 17px; max-width: 170px; }
+.split.ident .gauge-col { gap: 12px; } .split.ident .chip { font-size: 21px; padding: 10px 16px; }
+.split.value { grid-template-columns: 560px 1fr; }
+.value-chart .bar-row { grid-template-columns: 44px 52px minmax(220px, 330px) 90px 1fr 190px; height: 62px; }
+.pricetag { font-size: 24px; font-weight: 700; color: var(--gold); text-align: center; padding: 3px 0; border-radius: 99px; background: rgba(246, 196, 83, .12); border: 1px solid rgba(246, 196, 83, .35); }
+.bar-row.val .bv small { display: inline; font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.bar-row.val .bv { font-size: 28px; white-space: nowrap; }

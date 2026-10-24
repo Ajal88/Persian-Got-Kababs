@@ -121,6 +121,13 @@
     const decoys = R.filter((r) => !present.includes(r));
     const out = { restaurants: R, present, decoys, nPre: d.s1.length, nPost: d.s2.length };
     const kabByNo = Object.fromEntries(present.map((r) => [r.kabab, r]));
+    // Guests with a private plate numbering (e.g. the organisers) see different kabab numbers.
+    const priv = d.priv && d.priv.map ? d.priv.map : null;
+    const truthIdFor = (p, no) => (p.priv && priv ? priv[no] || null : (kabByNo[no] ? kabByNo[no].id : null));
+    const kabNoFor = (p, rid) => {
+      if (p.priv && priv) { const k = Object.keys(priv).find((x) => priv[x] === rid); return k == null ? null : +k; }
+      return byId[rid] ? byId[rid].kabab : null;
+    };
 
     /* ===== PRE-EVENT ===== */
     const pre = R.map((r) => {
@@ -173,7 +180,7 @@
     const cells = []; // each (person, kabab) response
     d.s2.forEach((p) => {
       Object.keys(p.k).forEach((no) => {
-        const c = p.k[no]; const truth = kabByNo[no];
+        const c = p.k[no]; const tid = truthIdFor(p, no); const truth = tid ? byId[tid] : null;
         cells.push({ pid: p.pid, name: p.name, kabab: +no, truth: truth ? truth.id : null, guess: c.guess, rating: c.rating, price: c.price,
           correct: truth && c.guess ? c.guess === truth.id : null });
       });
@@ -181,7 +188,7 @@
     out.cells = cells;
 
     const kabs = present.map((r) => {
-      const cs = cells.filter((c) => c.kabab === r.kabab);
+      const cs = cells.filter((c) => c.truth === r.id);
       const guessed = cs.filter((c) => c.guess);
       const counts = {};
       guessed.forEach((c) => { counts[c.guess] = (counts[c.guess] || 0) + 1; });
@@ -247,7 +254,7 @@
         pid: p.pid, name: p.name, correct, nGuess: g.length, accuracy: g.length ? correct / g.length : null,
         avgRating: mean(cs.map((c) => c.rating)), nRatings: nums(cs.map((c) => c.rating)).length,
         avgPrice: mean(cs.map((c) => c.price)), nPrices: pr.length, mape, bias,
-        correctKababs: g.filter((c) => c.correct).map((c) => c.kabab),
+        correctKababs: g.filter((c) => c.correct).map((c) => c.kabab), priv: !!p.priv,
       };
     });
     out.people = people;
@@ -294,7 +301,7 @@
         const pre1 = s1.rating[k.id]; if (pre1 == null) return;
         d.s2.forEach((s2) => {
           if (s2.pid !== s1.pid) return;
-          const c = s2.k[k.kabab]; if (c && c.rating != null) paired.push({ name: s1.name, pre: pre1, post: c.rating, diff: c.rating - pre1 });
+          const c = s2.k[kabNoFor(s2, k.id)]; if (c && c.rating != null) paired.push({ name: s1.name, pre: pre1, post: c.rating, diff: c.rating - pre1 });
         });
       });
       const gap = paired.length ? mean(paired.map((x) => x.diff)) : (p.avgRating != null && k.avgRating != null ? k.avgRating - p.avgRating : null);
@@ -322,7 +329,7 @@
       d.s1.forEach((s1) => {
         const pre1 = s1.rating[e.id]; if (pre1 == null) return;
         const s2 = d.s2.find((x) => x.pid === s1.pid); if (!s2) return;
-        const c = s2.k[e.kabab]; if (!c || c.rating == null) return;
+        const c = s2.k[kabNoFor(s2, e.id)]; if (!c || c.rating == null) return;
         pairs.push({ name: s1.name, restaurant: e.name, kabab: e.kabab, pre: pre1, post: c.rating, diff: c.rating - pre1, recognised: c.guess === e.id });
       });
     });
@@ -364,6 +371,8 @@
     }
     out.winner = out.winners[0] || null;
     out.last = post.length ? post[post.length - 1] : null;
+    out.priceRatingCorr = pearson(kabs.filter((k) => k.actualPrice != null && k.avgRating != null).map((k) => k.actualPrice), kabs.filter((k) => k.actualPrice != null && k.avgRating != null).map((k) => k.avgRating));
+    out.valueOrder = sortBy(kabs.filter((k) => k.value != null), (k) => k.value, 'desc');
     out.valueKing = extremes(kabs, (k) => k.value, 'max');
     out.valueWorst = extremes(kabs, (k) => k.value, 'min');
     out.avgRatingAll = mean(cells.map((c) => c.rating));
@@ -406,15 +415,17 @@
       return { pid: normName(row.name), name: String(row.name || '').trim(), rank, rating };
     }) : [];
     const links = setup.personLinks || {};
+    const privSet = new Set(setup.privateGuests || []);
     const s2 = raw2 ? dedupe(raw2.rows).map((row) => {
       const k = {};
       Object.entries(row.k).forEach(([no, c]) => {
         k[no] = { guess: toId(c.guess), rating: c.rating, price: c.price };
       });
       const n = normName(row.name);
-      return { pid: links[n] || n, name: String(row.name || '').trim(), k };
+      return { pid: links[n] || n, name: String(row.name || '').trim(), k, priv: privSet.has(n) };
     }) : [];
-    return { restaurants: R, s1, s2 };
+    const priv = setup.privateMap && Object.keys(setup.privateMap).length && privSet.size ? { map: setup.privateMap } : null;
+    return { restaurants: R, s1, s2, priv };
   }
 
   const KA = { latinDigits, toNumber, normName, normRestaurant, similarity, bestMatch, levenshtein, mean, median, stdev, pearson, round, analyze, resolve, sortBy, extremes };
