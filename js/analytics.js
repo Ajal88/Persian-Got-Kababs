@@ -417,6 +417,43 @@
     }
     out.twins = sortBy(pairsT, (x) => x.r, 'desc')[0] || null;
     out.opposites = sortBy(pairsT, (x) => x.r, 'asc')[0] || null;
+    // taste-similarity matrix (guest x guest) and each guest's alignment with the rest of the room
+    const sharedR = (u, v) => { const k = Object.keys(u).filter((x) => v[x] != null); return k.length >= 5 ? pearson(k.map((x) => u[x]), k.map((x) => v[x])) : null; };
+    const gp = d.s2.map((p) => p.pid), gn = d.s2.map((p) => p.name);
+    const alignment = gp.map((pid, i) => {
+      const mine = vec[pid], others = {};
+      Object.keys(mine).forEach((rid) => { const v = gp.filter((q, j) => j !== i && vec[q][rid] != null).map((q) => vec[q][rid]); if (v.length >= 2) others[rid] = mean(v); });
+      const k = Object.keys(others); return k.length >= 5 ? pearson(k.map((x) => mine[x]), k.map((x) => others[x])) : null;
+    });
+    const order = gp.map((_, i) => i).sort((x, y) => ((alignment[y] == null ? -9 : alignment[y]) - (alignment[x] == null ? -9 : alignment[x])));
+    out.sim = { names: order.map((i) => gn[i]), align: order.map((i) => alignment[i]), r: order.map((i) => order.map((j) => (i === j ? 1 : sharedR(vec[gp[i]], vec[gp[j]])))) };
+    // taste map: classical multidimensional scaling of (1 - correlation) into 2-D, plus room-level stats
+    (function () {
+      const N = out.sim.names.length; if (N < 3) return;
+      const D2 = out.sim.r.map((row) => row.map((r) => (1 - (r == null ? 0 : r)) ** 2));
+      const rm = D2.map((row) => mean(row)), gm = mean(rm);
+      const B = D2.map((row, i) => row.map((v, j) => -0.5 * (v - rm[i] - rm[j] + gm)));
+      const eig = (M, seed) => {
+        let v = seed.slice();
+        for (let it = 0; it < 200; it++) {
+          const w = M.map((row) => row.reduce((acc, x, j) => acc + x * v[j], 0)); const nrm = Math.sqrt(w.reduce((q, x) => q + x * x, 0)) || 1; v = w.map((x) => x / nrm);
+        }
+        const Mv = M.map((row) => row.reduce((acc, x, j) => acc + x * v[j], 0));
+        return { v, val: v.reduce((acc, x, i) => acc + x * Mv[i], 0) };
+      };
+      const e1 = eig(B, B.map((_, i) => 1 + i * 0.37));
+      const B2 = B.map((row, i) => row.map((x, j) => x - e1.val * e1.v[i] * e1.v[j]));
+      const e2 = eig(B2, B.map((_, i) => 1 - i * 0.29 + (i % 2)));
+      const xs = e1.v.map((x) => x * Math.sqrt(Math.max(e1.val, 0))), ys = e2.v.map((x) => x * Math.sqrt(Math.max(e2.val, 0)));
+      const extX = Math.max(...xs.map(Math.abs), 1e-9), extY = Math.max(Math.max(...ys.map(Math.abs)), extX / 2.2, 1e-9); // stretch the 2nd axis a little so the map fills its frame
+      out.sim.map = out.sim.names.map((name, i) => ({ name, x: xs[i] / extX, y: ys[i] / extY }));
+      const off = []; out.sim.r.forEach((row, i) => row.forEach((r, j) => { if (j > i && r != null) off.push(r); }));
+      out.sim.pairs = off.length; out.sim.avg = mean(off);
+      out.sim.kindred = off.filter((r) => r >= 0.5).length; out.sim.clash = off.filter((r) => r <= -0.3).length;
+    })();
+    const al = gn.map((name, i) => ({ name, r: alignment[i] })).filter((x) => x.r != null);
+    out.inTune = sortBy(al, (x) => x.r, 'desc')[0] || null;
+    out.contrarian = sortBy(al, (x) => x.r, 'asc')[0] || null;
     // does having been there help? (guest had rated the restaurant before the party)
     let fa = [0, 0], fn = [0, 0];
     cells.forEach((c) => {

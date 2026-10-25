@@ -1,6 +1,6 @@
 # Persian Kabab Showdown
 
-A blind kabab taste test, turned into a 14-slide reveal.
+A blind kabab taste test, turned into a 15-slide reveal.
 
 | File | What it is |
 |---|---|
@@ -54,7 +54,7 @@ Pick whichever is easiest:
 
 Press `X` at any time. Every guest is a chip; untick people to see the final table recomputed without them (rank, average score, price guesses, and ▲▼ change versus everyone). It says whether the winner changes. "Everyone / Nobody / Invert" are shortcuts. Nothing is saved; close it with `X` / `Esc`.
 
-## The 14 slides
+## The 15 slides
 
 1. Welcome and headline numbers
 2. **Hype Ranking** — best / worst perceived before eating
@@ -64,14 +64,15 @@ Press `X` at any time. Every guest is a chip; untick people to see the final tab
 6. **Guest Leaderboards** — everyone ranked: best detectives, best price guessers, harshest → most generous
 7. **The Price is Right** — guessed vs real prices, best guesser, steal of the night, sticker shock, big spender
 8. **Plot Twists** — halo effect, does experience help, taste twins & opposites, wisdom of the crowd, money talks, the usual suspect
-9. **The Table** — last place up to 2nd; **the top 3 stay hidden until their turn**, #1 stays locked
-10. **Hype vs Reality** — most anticipated, underperformer, underdog, most underrated, heartbreaks
-11. **Bang for the Buck** — taste points per $ (worst / best value)
-12. **Everyone's Favorite** — each guest's highest-scored kabab
-13. **The Popular Vote** — favorites and least favorites tally
-14. **The Winner** 👑 — drum-roll, kabab number, then the restaurant, with confetti
+9. **Hype vs Reality** — most anticipated, underperformer, underdog, most underrated, heartbreaks (places 1–3 show "🔒 revealed at the end")
+10. **Bang for the Buck** — taste points per $ (worst / best value), all restaurants named
+11. **Everyone's Favorite** — each guest's highest-scored kabab
+12. **The Popular Vote** — favorites and least favorites tally
+13. **Taste Similarity** — guest-by-guest similarity heatmap, a 2-D "taste map" (closer = more alike), taste twins and opposites, who is most in tune with the room and the contrarian, how many pairs are kindred spirits or clash
+14. **The Table** — last place up to 2nd; **the top 3 stay hidden until their turn**, #1 stays locked
+15. **The Winner** 👑 — drum-roll, kabab number, then the restaurant, with confetti
 
-Slides 1–8 show nothing about how any kabab scored, so the top 3 are only revealed on the table. From slide 9 on, the champion is masked as "🔒 The champion" until the final slide.
+Slides 10–12 show all the data and every restaurant name. The final placements are only revealed on the table (14) and the winner (15).
 
 ## Private numbering (optional)
 
