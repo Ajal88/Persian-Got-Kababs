@@ -289,8 +289,13 @@
     out.totalActual = sum(present.map((r) => r.price));
 
     /* ----- expectations vs reality ----- */
-    const post = sortBy(kabs.filter((k) => k.avgRating != null), (k) => k.avgRating, 'desc');
-    post.forEach((k, i) => { k.blindPos = i + 1; });
+    const post = kabs.filter((k) => k.avgRating != null).sort((x, y) => (y.avgRating - x.avgRating) || ((y.avgPrice || 0) - (x.avgPrice || 0)) || x.name.localeCompare(y.name));
+    post.forEach((k, i) => {
+      const prev = post[i - 1];
+      k.blindPos = prev && Math.abs(prev.avgRating - k.avgRating) < 1e-9 ? prev.blindPos : i + 1; // ties share a place
+      k.tied = post.some((o) => o !== k && Math.abs(o.avgRating - k.avgRating) < 1e-9);
+    });
+    out.top3Ids = post.filter((k) => k.blindPos <= 3).map((k) => k.id);
     out.blindOrder = post;
     const preP = sortBy(present.map((r) => preById[r.id]), (x) => x.avgRank, 'asc');
     preP.forEach((x, i) => { x.hypePosPresent = i + 1; });
@@ -378,6 +383,59 @@
     out.avgRatingAll = mean(cells.map((c) => c.rating));
     out.nRatingsAll = nums(cells.map((c) => c.rating)).length;
     out.nPre1Ratings = sum(pre.map((x) => x.nRatings));
+    /* ===== extra insight ===== */
+    const s1ByPid = Object.fromEntries(d.s1.map((p) => [p.pid, p]));
+    // guest leaderboards
+    out.boards = {
+      detective: out.accuracyBoard,
+      price: people.filter((p) => p.nPrices >= 3 && p.mape != null).sort((a, b) => a.mape - b.mape),
+      taste: people.filter((p) => p.nRatings >= 3).sort((a, b) => a.avgRating - b.avgRating), // harshest first
+    };
+    // individual favourites / least favourites (restaurants, using each guest's own numbering)
+    const favs = [];
+    d.s2.forEach((p) => {
+      const cs = cells.filter((c) => c.pid === p.pid && c.rating != null && c.truth && byId[c.truth] && byId[c.truth].present);
+      if (cs.length < 2) return;
+      const hi = Math.max(...cs.map((c) => c.rating)), lo = Math.min(...cs.map((c) => c.rating));
+      const pick = (v) => cs.filter((c) => c.rating === v).map((c) => ({ id: c.truth, name: byId[c.truth].name, rating: c.rating }));
+      favs.push({ pid: p.pid, name: p.name, best: pick(hi), worst: hi === lo ? [] : pick(lo), avg: mean(cs.map((c) => c.rating)) });
+    });
+    out.favs = favs;
+    const voteBy = (key) => present.map((r) => ({ id: r.id, name: r.name, n: favs.filter((f) => f[key].some((x) => x.id === r.id)).length }));
+    out.topPicks = voteBy('best').sort((a, b) => b.n - a.n);
+    out.lastPicks = voteBy('worst').sort((a, b) => b.n - a.n);
+    // taste twins / opposites
+    const vec = {};
+    d.s2.forEach((p) => { const v = {}; cells.filter((c) => c.pid === p.pid && c.rating != null && c.truth).forEach((c) => { v[c.truth] = c.rating; }); vec[p.pid] = v; });
+    const pairsT = [];
+    for (let i = 0; i < d.s2.length; i++) for (let j = i + 1; j < d.s2.length; j++) {
+      const a = vec[d.s2[i].pid], b = vec[d.s2[j].pid];
+      const keys = Object.keys(a).filter((k) => b[k] != null);
+      if (keys.length < 5) continue;
+      const r = pearson(keys.map((k) => a[k]), keys.map((k) => b[k]));
+      if (r != null) pairsT.push({ a: d.s2[i].name, b: d.s2[j].name, r, n: keys.length });
+    }
+    out.twins = sortBy(pairsT, (x) => x.r, 'desc')[0] || null;
+    out.opposites = sortBy(pairsT, (x) => x.r, 'asc')[0] || null;
+    // does having been there help? (guest had rated the restaurant before the party)
+    let fa = [0, 0], fn = [0, 0];
+    cells.forEach((c) => {
+      if (!c.guess || !c.truth) return;
+      const known = s1ByPid[c.pid] && s1ByPid[c.pid].rating[c.truth] != null;
+      const t = known ? fa : fn; t[1]++; if (c.correct) t[0]++;
+    });
+    out.experience = { known: fa[1] ? fa[0] / fa[1] : null, nKnown: fa[1], unknown: fn[1] ? fn[0] / fn[1] : null, nUnknown: fn[1] };
+    // wisdom of the crowd on prices
+    const crowdErr = mean(kabs.filter((k) => k.avgPrice != null && k.actualPrice).map((k) => Math.abs(k.avgPrice - k.actualPrice) / k.actualPrice));
+    const indiv = people.filter((p) => p.mape != null);
+    out.crowdPrice = crowdErr == null || !indiv.length ? null : { crowd: crowdErr, avgIndividual: mean(indiv.map((p) => p.mape)), beat: indiv.filter((p) => p.mape > crowdErr).length, of: indiv.length };
+    // money talks: do tastier kababs get higher price guesses (relative to their real price)?
+    const mc = cells.filter((c) => c.rating != null && c.price != null && c.truth && byId[c.truth].price);
+    out.moneyTalks = mc.length >= 6 ? { r: pearson(mc.map((c) => c.rating), mc.map((c) => c.price / byId[c.truth].price)), n: mc.length } : null;
+    // polarising / unanimous kabab (spread of ratings; no ranking info)
+    out.polarising = extremes(kabs.filter((k) => k.ratingStd != null), (k) => k.ratingStd, 'max');
+    out.unanimous = extremes(kabs.filter((k) => k.ratingStd != null), (k) => k.ratingStd, 'min');
+    out.invisible = extremes(guessRows.filter((x) => x.present), (x) => x.n, 'min');
     out.matchedPeople = d.s2.filter((p) => d.s1.some((q) => q.pid === p.pid)).length;
     return out;
   }

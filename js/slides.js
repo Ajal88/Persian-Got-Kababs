@@ -1,4 +1,4 @@
-/* The 10 slides. Each slide: { id, section, steps, render(a, ctx) -> html }.
+/* The slides. Each slide: { id, section, steps, render(a, ctx) -> html }.
  * Elements with data-step="n" appear when the presenter reaches step n of that slide. */
 (function (root) {
   'use strict';
@@ -12,7 +12,7 @@
   const sgn = (x, d = 1) => (x == null ? '–' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(Math.round(x * 10 ** d) / 10 ** d));
   const plural = (n, w, ws) => `${n} ${n === 1 ? w : (ws || w + 's')}`;
   const nm = (s) => `<bdi>${esc(s)}</bdi>`;
-  const list = (arr, key = 'name') => arr.map((x) => nm(x[key])).join(' &amp; ');
+  const list = (arr, key = 'name') => (arr.length > 3 ? arr.slice(0, 2).map((x) => nm(x[key])).join(' &amp; ') + ` &amp; ${arr.length - 2} more` : arr.map((x) => nm(x[key])).join(' &amp; '));
   const hue = (s) => { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 
   function ctxHelpers(a, ctx) {
@@ -222,6 +222,36 @@
     },
   });
 
+  /* ---- shared bits for the new slides ---- */
+  const champIds = (a) => new Set((a.winners || []).map((w) => w.id));
+  function rankRows(arr, keyFn, tol = 1e-9) {
+    let last = null, pos = 0;
+    return arr.map((x, i) => { const k = keyFn(x); if (last === null || Math.abs(k - last) > tol) { pos = i + 1; last = k; } return { x, pos }; });
+  }
+  const avatar = (name, size) => `<span class="avatar" style="--h:${hue(name)};width:${size}px;height:${size}px;font-size:${Math.round(size * .45)}px">${esc(String(name).trim().slice(0, 1).toUpperCase())}</span>`;
+  const maskLogo = (size) => `<span class="logo mono q" style="--sz:${size}px"><b>?</b></span>`;
+
+  /* 6 — Guest leaderboards */
+  slides.push({
+    id: 'boards', section: 'The blind test', steps: 3,
+    render(a) {
+      const b = a.boards;
+      if (!b || !b.detective.length) return head('The blind test', 'Guest Leaderboards') + empty('No second-survey results yet.');
+      const n = Math.max(b.detective.length, b.price.length, b.taste.length);
+      const rh = Math.min(54, Math.floor(600 / Math.max(1, n)));
+      const col = (title, sub, rows, step, fmt, medals) => {
+        const li = rows.map(({ x, pos }) => `<li class="${medals && pos === 1 ? 'first' : ''}"><span class="lb-pos">${medals && pos <= 3 ? ['🥇', '🥈', '🥉'][pos - 1] : pos}</span>${avatar(x.name, rh - 14)}<span class="lb-name">${nm(x.name)}</span><span class="lb-val">${fmt(x)}</span></li>`).join('');
+        return `<div class="lb" data-step="${step}" style="--rh:${rh}px"><div class="lb-head"><b>${title}</b><small>${sub}</small></div><ol>${li || '<li class="empty">Not enough data</li>'}</ol></div>`;
+      };
+      return `${head('The blind test', 'Guest <em>Leaderboards</em>', 'Three ways to rank the room')}
+      <div class="lb-grid">
+        ${col('🕵️ Best detectives', 'kababs identified', rankRows(b.detective, (p) => p.correct), 1, (p) => `<b>${p.correct}</b>/${p.nGuess}`, true)}
+        ${col('🎯 Best price guessers', 'average miss', rankRows(b.price, (p) => p.mape, 0.0005), 2, (p) => `±${pct(p.mape)}`, true)}
+        ${col('🌡️ Harshest → most generous', 'average score given', rankRows(b.taste, (p) => p.avgRating, 0.005), 3, (p) => `<b>${p.avgRating.toFixed(1)}</b>`, false)}
+      </div>`;
+    },
+  });
+
   /* 7 — The price is right */
   slides.push({
     id: 'price', section: 'The blind test', steps: 5,
@@ -251,14 +281,73 @@
     },
   });
 
-  /* 8 — Expectation vs reality */
+  /* 8 — Plot twists */
+  slides.push({
+    id: 'twists', section: 'The blind test', steps: 6,
+    render(a, ctx) {
+      const H = ctxHelpers(a, ctx);
+      if (!a.totalGuesses) return head('The blind test', 'Plot Twists') + empty('No second-survey results yet.');
+      const card = (step, tone, kicker, big, text, note) => `<div class="twist ${tone}" data-step="${step}"><div class="kicker">${kicker}</div><div class="twist-big">${big}</div><div class="twist-txt">${text}</div>${note ? `<div class="twist-note">${note}</div>` : ''}</div>`;
+      const h = a.halo, ex = a.experience, tw = a.twins, op = a.opposites, cp = a.crowdPrice, mt = a.moneyTalks;
+      const mag = a.guessMagnet[0], inv = a.invisible[0];
+      const cards = [];
+      cards.push(h && h.diff != null
+        ? card(1, 'gold', '🎭 The halo effect', `${sgn(h.diff)}<small> pts</small>`, `Kababs guests <b>believed</b> came from a top-hyped restaurant scored <b>${f1(h.hyped)}</b>, versus <b>${f1(h.unhyped)}</b> for those they thought were from the least-hyped ones.`, 'Belief changes taste — a little.')
+        : card(1, 'gold', '🎭 The halo effect', '–', 'Not enough guesses to compare.'));
+      cards.push(ex && ex.known != null && ex.unknown != null
+        ? card(2, 'teal', '📍 Does experience help?', `${pct(ex.known)}<small> vs ${pct(ex.unknown)}</small>`, `Guests recognised a restaurant they had <b>already rated</b> ${pct(ex.known)} of the time, versus ${pct(ex.unknown)} for places they had not tried.`, Math.abs(ex.known - ex.unknown) < 0.08 ? 'Having been there made almost no difference.' : ex.known > ex.unknown ? 'Having been there helps.' : 'Having been there did not help at all.')
+        : card(2, 'teal', '📍 Does experience help?', '–', 'Not enough data to compare.'));
+      cards.push(tw
+        ? card(3, '', '👯 Taste twins', `${nm(tw.a)} &amp; ${nm(tw.b)}`, `Scored the kababs almost identically (correlation <b>${f2(tw.r)}</b> over ${tw.n} kababs).`, op ? `Taste opposites: <b>${nm(op.a)}</b> &amp; <b>${nm(op.b)}</b> (${f2(op.r)})` : '')
+        : card(3, '', '👯 Taste twins', '–', 'Not enough data.'));
+      cards.push(cp
+        ? card(4, 'teal', '🧠 Wisdom of the crowd', `${cp.beat}<small> of ${cp.of}</small>`, `The group's <b>average</b> price guess missed by ${pct(cp.crowd)}, beating <b>${plural(cp.beat, 'individual')}</b> out of ${cp.of} (typical guest missed by ${pct(cp.avgIndividual)}).`, cp.beat >= cp.of / 2 ? 'Crowds beat most people.' : '')
+        : card(4, 'teal', '🧠 Wisdom of the crowd', '–', 'Not enough price guesses.'));
+      cards.push(mt && mt.r != null
+        ? card(5, 'spicy', '💸 Money talks', f2(mt.r), mt.r > 0.25 ? 'Guests offered <b>more money</b> for kababs they scored higher — taste really did drive willingness to pay.' : mt.r < -0.25 ? 'Weirdly, guests offered <b>less</b> for kababs they scored higher.' : 'Price guesses had <b>almost nothing to do</b> with how good the kabab tasted.', `correlation over ${mt.n} ratings`)
+        : card(5, 'spicy', '💸 Money talks', '–', 'Not enough data.'));
+      cards.push(mag
+        ? card(6, 'bad', '🕵️ The usual suspect', `${nm(mag.name)}`, `Named <b>${plural(mag.n, 'time')}</b> — more than any other restaurant${mag.present ? '' : ', even though it was a <b>decoy</b>'}.`, inv ? `Least suspected of the served ones: <b>${nm(inv.name)}</b> (${plural(inv.n, 'guess', 'guesses')}).` : '')
+        : card(6, 'bad', '🕵️ The usual suspect', '–', 'Not enough guesses.'));
+      return `${head('The blind test', 'Plot <em>Twists</em>', 'What the numbers say about us')}<div class="twist-grid">${cards.join('')}</div>`;
+    },
+  });
+
+  /* 9 — The table (top 3 revealed here, one by one; #1 stays locked) */
+  slides.push({
+    id: 'countdown', section: 'The verdict', steps: null,
+    stepCount: (a) => Math.max(0, a.blindOrder.length - 1),
+    render(a, ctx) {
+      const H = ctxHelpers(a, ctx);
+      const N = a.blindOrder.length;
+      if (!N) return head('The verdict', 'The Table') + empty('No ratings yet.');
+      const rowH = Math.min(92, Math.floor(650 / N));
+      const rows = a.blindOrder.map((k, idx) => {
+        const label = `${k.blindPos}${k.tied ? '=' : ''}`;
+        const step = N - idx; // last place first
+        const champ = idx === 0;
+        const ph = `<div class="cd-ph ${champ ? 'champ' : ''} ${k.blindPos <= 3 ? 'top3' : ''}" ${champ ? '' : `data-hide-from="${step}"`}><span class="cd-pos">${label}</span><span class="cd-q">${champ ? '🔒 The champion — revealed on the final slide' : k.blindPos <= 3 ? '🔒 Top 3' : '?'}</span></div>`;
+        if (champ) return `<div class="cd-slot" style="--rh:${rowH}px">${ph}</div>`;
+        return `<div class="cd-slot" style="--rh:${rowH}px">${ph}
+          <div class="cd-row ${k.blindPos <= 3 ? 'top3' : ''}" data-step="${step}"><span class="cd-pos">${label}</span>${H.logo(k.id, rowH - 22)}
+            <span class="cd-name">${nm(k.name)}<small>Kabab #${k.kabab} · ${plural(k.nRatings, 'rating')}</small></span>
+            <span class="track"><span class="bar" style="--w:${(k.avgRating / 10) * 100}%"></span></span>
+            <span class="cd-score">${k.avgRating.toFixed(2)}</span>
+            <span class="cd-price"><small>guessed / real</small>${H.money(k.avgPrice)} <i>/</i> ${H.money(k.actualPrice)}</span></div></div>`;
+      });
+      return `${head('The verdict', 'The <em>Table</em>', 'Average blind rating out of 10 — from last place up. The top 3 stay hidden until their turn.')}
+      <div class="countdown">${rows.join('')}</div>`;
+    },
+  });
+
+  /* 10 — Expectation vs reality (after the table; only the champion is masked) */
   slides.push({
     id: 'reality', section: 'The verdict', steps: 5,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
       if (!a.exp.length || !a.blindOrder.length) return head('The verdict', 'Hype vs Reality') + empty('Needs both surveys.');
       const K = a.present.length;
-      const journey = (e) => `<div class="journey"><span class="pill">Hype <b>#${e.hypePos}</b></span><span class="arrow">➜</span><span class="pill ${e.move > 0 ? 'up' : e.move < 0 ? 'down' : ''}">Blind <b>${finishLabel(e.blindPos, K)}</b></span></div>`;
+      const journey = (e) => `<div class="journey"><span class="pill">Hype <b>#${e.hypePos}</b></span><span class="arrow">➜</span><span class="pill ${e.blindPos === 1 ? '' : e.move > 0 ? 'up' : e.move < 0 ? 'down' : ''}">Blind <b>${finishLabel(e.blindPos, K)}</b></span></div>`;
       const card = (kicker, arr, step, tone, note) => {
         if (!arr.length) return `<div class="award ${tone} none" data-step="${step}"><div class="kicker">${kicker}</div><div class="none-msg">Nobody qualified.</div></div>`;
         const e = arr[0];
@@ -275,40 +364,48 @@
       const hb = a.heartbreaks[0], su = a.surprises[0];
       if (hb) strip.push(`<div class="strip-item">💔 <b>${nm(hb.name)}</b> rated ${nm(hb.restaurant)} a <b>${hb.pre}</b> before… then gave its kabab a <b>${hb.post}</b>${hb.recognised ? '' : ' without knowing it'}.</div>`);
       if (su) strip.push(`<div class="strip-item">😍 <b>${nm(su.name)}</b> went from a <b>${su.pre}</b> to a <b>${su.post}</b> for ${nm(su.restaurant)}.</div>`);
+      const hidden = (e) => e.blindPos === 1;
       return `${head('The verdict', 'Hype vs <em>Reality</em>', 'Where each restaurant stood before the party compared with how its kabab did blind')}
       <div class="grid2">
-        ${card('⭐ Most anticipated', a.mostAnticipated, 1, '', (e) => (e.postAvg != null ? `Blind average: <b>${f1(e.postAvg)}</b>${e.preAvg != null ? ` · fans said <b>${f1(e.preAvg)}</b>` : ''}` : ''))}
-        ${card('📉 The underperformer', a.underperformer, 2, 'bad', (e) => `Slid <b>${Math.abs(e.move)}</b> ${Math.abs(e.move) === 1 ? 'place' : 'places'} from the hype`)}
-        ${card('🐕 The underdog', a.underdog, 3, 'teal', (e) => `Climbed <b>${e.move}</b> ${e.move === 1 ? 'place' : 'places'} from the bottom half of the hype`)}
+        ${card('⭐ Most anticipated', a.mostAnticipated, 1, '', (e) => (hidden(e) ? 'How it really did? <b>The final slide</b> will tell.' : `Blind average: <b>${f1(e.postAvg)}</b>${e.preAvg != null ? ` · fans said <b>${f1(e.preAvg)}</b>` : ''}`))}
+        ${card('📉 The underperformer', a.underperformer, 2, 'bad', (e) => (hidden(e) ? 'Fell short of the hype.' : `Slid <b>${Math.abs(e.move)}</b> ${Math.abs(e.move) === 1 ? 'place' : 'places'} from the hype`))}
+        ${card('🐕 The underdog', a.underdog, 3, 'teal', (e) => (hidden(e) ? 'Nobody expected much — and it went all the way.' : `Climbed <b>${e.move}</b> ${e.move === 1 ? 'place' : 'places'} from the bottom half of the hype`))}
         ${card('📈 Most underrated', a.mostUnderrated, 4, 'gold', (e) => `Blind scores beat the reputation by <b>${sgn(e.gap)}</b> points${e.nPaired ? ` (${plural(e.nPaired, 'guest')} rated both)` : ''}`)}
       </div>
       <div class="strip" data-step="5">${strip.join('')}</div>`;
     },
   });
 
-  /* 8 — Bang for the buck */
+  /* 11 — Bang for the buck (champion masked) */
   slides.push({
     id: 'value', section: 'The verdict', steps: 3,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
       const vs = a.valueOrder;
       if (vs.length < 2) return head('The verdict', 'Bang for the Buck') + empty('Needs prices and ratings.');
+      const champ = champIds(a);
       const max = vs[0].value;
       const bestId = a.valueKing.map((k) => k.id), worstId = a.valueWorst.map((k) => k.id);
-      const rows = vs.map((k, i) => `<div class="bar-row val ${bestId.includes(k.id) ? 'best' : worstId.includes(k.id) ? 'worst' : ''}" style="--i:${i}">
-        <span class="rk">${i + 1}</span>${H.logo(k.id, 48)}<span class="bn">${nm(k.name)}</span><span class="pricetag">${H.money(k.actualPrice)}</span>
+      const rows = vs.map((k, i) => {
+        const m = champ.has(k.id);
+        return `<div class="bar-row val ${bestId.includes(k.id) ? 'best' : worstId.includes(k.id) ? 'worst' : ''}" style="--i:${i}">
+        <span class="rk">${i + 1}</span>${m ? maskLogo(48) : H.logo(k.id, 48)}<span class="bn">${m ? '🔒 The champion' : nm(k.name)}</span><span class="pricetag">${m ? '?' : H.money(k.actualPrice)}</span>
         <span class="track"><span class="bar" style="--w:${Math.max(5, (k.value / max) * 100)}%"></span></span>
-        <span class="bv">${k.value.toFixed(2)}<small>pts per ${esc(ctx.cfg.currency)}</small></span></div>`).join('');
+        <span class="bv">${m ? '?' : `${k.value.toFixed(2)}<small>pts per ${esc(ctx.cfg.currency)}</small>`}</span></div>`;
+      }).join('');
       const b = a.valueKing[0], w = a.valueWorst[0];
       const c = a.priceRatingCorr;
       const link = c == null ? '' : Math.abs(c) < 0.3 ? 'barely related' : c > 0 ? 'linked: you mostly <b>got what you paid for</b>' : 'inversely linked: <b>the pricier the kabab, the lower the score</b>';
+      const vcard = (kicker, items, tone, step) => {
+        const k = items[0];
+        if (champ.has(k.id)) return `<div class="award ${tone}" data-step="${step}"><div class="kicker">${kicker}</div><div class="award-body">${maskLogo(96)}<div class="award-txt"><div class="award-name">The champion 🔒</div><div class="award-stat">Revealed on the final slide</div></div></div></div>`;
+        return award(H, { kicker, items, tone, step, stat: `<b>${k.value.toFixed(2)}</b> points per ${esc(ctx.cfg.currency)}`, note: `${H.money(k.actualPrice)} a kabab · <b>${H.money(k.actualPrice / (k.avgRating || 1))}</b> for every taste point` });
+      };
       return `${head('The verdict', 'Bang for the <em>Buck</em>', 'Taste points earned per dollar of menu price (higher = better value)')}
       <div class="split value">
         <div class="col-awards">
-          ${award(H, { kicker: '🪙 Worst bang for the buck', items: a.valueWorst, tone: 'bad', step: 1,
-            stat: `<b>${w.value.toFixed(2)}</b> points per ${esc(ctx.cfg.currency)}`, note: `${H.money(w.actualPrice)} a kabab · <b>${H.money(w.actualPrice / (w.avgRating || 1))}</b> for every taste point` })}
-          ${award(H, { kicker: '💰 Best bang for the buck', items: a.valueKing, tone: 'gold', step: 2,
-            stat: `<b>${b.value.toFixed(2)}</b> points per ${esc(ctx.cfg.currency)}`, note: `${H.money(b.actualPrice)} a kabab · <b>${H.money(b.actualPrice / (b.avgRating || 1))}</b> for every taste point` })}
+          ${vcard('🪙 Worst bang for the buck', a.valueWorst, 'bad', 1)}
+          ${vcard('💰 Best bang for the buck', a.valueKing, 'gold', 2)}
         </div>
         <div class="chart bars value-chart">${rows}
           ${link ? `<div class="fine" data-step="3">💸 Price tag vs. taste score: ${link} <small>(correlation ${f2(c)})</small></div>` : ''}</div>
@@ -316,45 +413,67 @@
     },
   });
 
-  /* 9 — Countdown */
+  /* 12 — Everyone's favourite */
   slides.push({
-    id: 'countdown', section: 'The verdict', steps: null,
-    stepCount: (a) => Math.max(0, a.blindOrder.length - 1),
+    id: 'favorites', section: 'The verdict', steps: 1,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
-      const N = a.blindOrder.length;
-      if (!N) return head('The verdict', 'The Countdown') + empty('No ratings yet.');
-      const rowH = Math.min(92, Math.floor(660 / N));
-      const maxR = 10;
-      const rows = a.blindOrder.slice(1).map((k, idx) => {
-        const pos = idx + 2; const step = N - pos + 1;
-        return `<div class="cd-row ${pos === 2 ? 'second' : ''}" data-step="${step}" style="--rh:${rowH}px">
-          <span class="cd-pos">${pos}</span>${H.logo(k.id, rowH - 22)}
-          <span class="cd-name">${nm(k.name)}<small>Kabab #${k.kabab} · ${plural(k.nRatings, 'rating')}</small></span>
-          <span class="track"><span class="bar" style="--w:${(k.avgRating / maxR) * 100}%"></span></span>
-          <span class="cd-score">${k.avgRating.toFixed(2)}</span>
-          <span class="cd-price"><small>guessed / real</small>${H.money(k.avgPrice)} <i>/</i> ${H.money(k.actualPrice)}</span>
-        </div>`;
-      });
-      const locked = `<div class="cd-row locked" style="--rh:${rowH}px"><span class="cd-pos">1</span><span class="logo mono q" style="--sz:${rowH - 22}px"><b>?</b></span>
-        <span class="cd-name">The champion<small>Revealed on the next slide…</small></span></div>`;
-      return `${head('The verdict', 'The <em>Countdown</em>', 'Average blind rating out of 10, from last place up')}
-      <div class="countdown">${locked}${rows.join('')}</div>`;
+      if (!a.favs.length) return head('The verdict', 'Everyone’s Favorite') + empty('No ratings yet.');
+      const champ = champIds(a);
+      const n = a.favs.length, cols = n <= 8 ? 4 : n <= 12 ? 4 : 5, rows = Math.ceil(n / cols);
+      const ch = Math.min(170, Math.floor(640 / rows) - 14);
+      const cards = a.favs.map((f, i) => {
+        const bests = f.best.slice(0, 2);
+        const ent = bests.map((b) => (champ.has(b.id) ? `<span class="fav-r">${maskLogo(40)}<span>🔒 The champion</span></span>` : `<span class="fav-r">${H.logo(b.id, 40)}<span>${nm(b.name)}</span></span>`)).join('');
+        return `<div class="fav" style="--i:${i};--ch:${ch}px"><div class="fav-who">${avatar(f.name, 46)}<b>${nm(f.name)}</b><span class="fav-score">${f.best[0].rating}<small>/10</small></span></div>${ent}</div>`;
+      }).join('');
+      const ties = a.favs.filter((f) => f.best.length > 1).length;
+      return `${head('The verdict', 'Everyone’s <em>Favorite</em>', 'The highest-scored kabab of each guest')}
+      <div class="fav-grid" style="--cols:${cols}">${cards}</div>
+      ${ties ? `<div class="fine" data-step="1">🤝 ${plural(ties, 'guest')} could not pick just one (a tie at the top).</div>` : ''}`;
     },
   });
 
-  /* 10 — Winner */
+  /* 13 — The popular vote */
+  slides.push({
+    id: 'votes', section: 'The verdict', steps: 2,
+    render(a, ctx) {
+      const H = ctxHelpers(a, ctx);
+      if (!a.favs.length) return head('The verdict', 'The Popular Vote') + empty('No ratings yet.');
+      const champ = champIds(a);
+      const chart = (arr, tone) => {
+        const max = Math.max(1, ...arr.map((x) => x.n));
+        return arr.map((x, i) => { const m = champ.has(x.id); return `<div class="bar-row vote ${tone}" style="--i:${i}">${m ? maskLogo(44) : H.logo(x.id, 44)}<span class="bn">${m ? '🔒 The champion' : nm(x.name)}</span><span class="track"><span class="bar" style="--w:${Math.max(x.n ? 4 : 0, (x.n / max) * 100)}%"></span></span><span class="bv">${x.n}</span></div>`; }).join('');
+      };
+      const nGuests = a.favs.length;
+      return `${head('The verdict', 'The Popular <em>Vote</em>', `How many of the ${nGuests} guests ranked each kabab as their favorite — and as their least favorite`)}
+      <div class="vote-cols">
+        <div class="vote-col" data-step="1"><div class="chart-title">👍 Picked as <em>favorite</em></div><div class="chart bars">${chart(a.topPicks, 'good')}</div></div>
+        <div class="vote-col" data-step="2"><div class="chart-title">👎 Picked as <em>least favorite</em></div><div class="chart bars">${chart(a.lastPicks, 'badv')}</div></div>
+      </div>`;
+    },
+  });
+
+  /* 14 — Winner */
   slides.push({
     id: 'winner', section: 'The verdict', steps: 2, finale: true,
     render(a, ctx) {
       const H = ctxHelpers(a, ctx);
       const w = a.winner;
       if (!w) return head('The verdict', 'The Winner') + empty('No ratings yet.');
-      const photo = ctx.img('kabab-' + w.kabab) || ctx.img('group');
+      const kPhoto = ctx.img('kabab-' + w.kabab), gPhoto = ctx.img('group');
       const runner = a.blindOrder.find((k) => !a.winners.includes(k));
       const margin = runner ? w.avgRating - runner.avgRating : null;
       const names = a.winners.map((x) => nm(x.name)).join(' <span class="amp">&amp;</span> ');
       const best = a.valueKing.some((k) => k.id === w.id);
+      const votes = (a.topPicks.find((x) => x.id === w.id) || {}).n;
+      const e = a.exp.find((x) => x.id === w.id);
+      const foot = [
+        w.topGuess && w.topGuess.id !== w.id ? `Most guests thought it was <b>${nm(w.topGuess.name)}</b>.` : '',
+        votes ? `It was the favorite of <b>${votes}</b> of ${a.favs.length} guests.` : '',
+        best ? 'Also the best value of the night.' : '',
+        e ? `Hype ranking before the party: <b>#${e.hypePos}</b> of ${a.present.length}.` : '',
+      ].filter(Boolean).join(' ');
       return `<div class="finale">
         <div class="drum" data-hide-from="1"><div class="eyebrow center"><i></i>The moment you've been waiting for<i></i></div>
           <h1 class="drum-h">And the best kabab<br>of the night is…</h1><div class="beat"><i></i><i></i><i></i></div></div>
@@ -370,12 +489,13 @@
             <div><b>${pct(w.accuracy)}</b><span>of guests recognised it</span></div>
             ${margin != null && margin > 0 ? `<div><b>${sgn(margin, 2)}</b><span>ahead of ${nm(runner.name)}</span></div>` : ''}
           </div>
-          <div class="win-foot">${w.topGuess && w.topGuess.id !== w.id ? `Most guests thought it was <b>${nm(w.topGuess.name)}</b>. ` : ''}${best ? 'Also the best value of the night. ' : ''}${(() => { const e = a.exp.find((x) => x.id === w.id); return e ? `Hype ranking before the party: <b>#${e.hypePos}</b> of ${a.present.length}.` : ''; })()}</div>
-          ${photo ? `<img class="win-photo" src="${photo}" alt="">` : ''}
+          <div class="win-foot">${foot}</div>
+          ${kPhoto ? `<img class="win-photo k" src="${kPhoto}" alt="">` : ''}
+          ${gPhoto ? `<img class="win-photo g" src="${gPhoto}" alt="">` : ''}
         </div>
       </div>`;
     },
   });
 
-  root.KASlides = { slides, esc };
+  root.KASlides = { slides, esc, helpers: ctxHelpers, nm, pct, f2, hue };
 })(window);

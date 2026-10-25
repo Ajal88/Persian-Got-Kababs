@@ -1,20 +1,43 @@
-# Persian Kabab Showdown Studio
+# Persian Kabab Showdown
 
-Turn the results of your blind kabab taste test into a 10-slide, projector-ready reveal.
-No install, no server, no internet: **double-click `index.html`** (Chrome, Edge, Firefox or Safari).
+A blind kabab taste test, turned into a 14-slide reveal.
 
-## How to use
+| File | What it is |
+|---|---|
+| **`index.html`** | The published slides (generated). This is what GitHub Pages serves. |
+| **`setup.html`** | The Studio: upload survey results, describe the restaurants, add pictures, preview, and export. |
+| `kabab-showdown-setup.json` | The saved setup (restaurant key, prices, pictures, name matches). |
+| `data/*.xlsx` | The survey exports (the `*_Corrected.xlsx` files are the ones in use). |
+| `build.js` | Regenerates `index.html` (and `assets/`) from the setup + `data/`. |
 
-1. Open `index.html`.
-2. **Event**: set the title, tagline, currency, and upload an event logo / title photo / group photo (all optional).
-3. **Survey results**: drop in the two Excel exports (`.xlsx` or `.csv`) — *before eating* and *after eating*.
-4. **Which restaurants were served?** Switch on the served restaurants, pick the kabab number each one was, and enter its price. Anything switched off is a decoy. Click a "+" square to add a restaurant logo.
-5. **Tidy-up** (appears only if needed): the app auto-fixes spelling differences (e.g. "Caspian Kabob" → "Caspian Kebab") and matches guests between the two surveys by name. Correct anything it got wrong.
-6. Optionally upload a photo per kabab for the winner reveal, then press **Start the presentation**.
+No install, no server: open `setup.html` or `index.html` by double-click (Chrome, Edge, Firefox, Safari).
 
-Not ready yet? Press **Preview with demo data** to see the whole show with fake results.
+## Publishing on GitHub Pages
 
-Everything is saved in your browser, so you can close the page and come back. "Save setup file" exports a backup.
+1. Repo → **Settings → Pages → Deploy from a branch → `main` / root**.
+2. The slides are at `https://<user>.github.io/<repo>/` (`index.html`). The Studio is at `…/setup.html`.
+
+## Changing the data (regenerating `index.html`)
+
+Pick whichever is easiest:
+
+* **Replace the Excel files and rebuild.** Put the new exports in `data/` under the same names as `file1` / `file2` in the setup file, then run `node build.js` (Node 16+, no `npm install`). It re-reads the Excel files, re-matches names, and rewrites `index.html` and `assets/`.
+* **Automatic.** `.github/workflows/build.yml` runs `node build.js` on GitHub whenever `kabab-showdown-setup.json`, `data/`, `js/` or `css/` change on `main`, and commits the new `index.html`. (Repo → Settings → Actions → General → Workflow permissions must allow read & write.)
+* **From the Studio.** Open `setup.html`, change things, then either **Download index.html** (self-contained, pictures embedded; drop it into the repo) or **Save setup file** and replace `kabab-showdown-setup.json`.
+
+`node build.js --inline` embeds the pictures in `index.html` instead of writing `assets/`.
+
+## Using the Studio (`setup.html`)
+
+1. **Event**: title, tagline, date, `$` symbol, logo, title photo, group photo.
+2. **Survey results**: drop the *before* and *after* exports (`.xlsx` / `.csv`).
+3. **Restaurants**: tick which were served, give each its kabab number and price — or upload a key file (`kabab number · restaurant · price`).
+4. **Tidy-up** (only if needed): spelling variants and guest matching across the two surveys are auto-detected; fix any that are wrong.
+5. **Private numbering** (optional, off by default): see below.
+6. **Kabab pictures**: one per kabab, for the winner slide.
+7. **Publish**: download `index.html`. **Preview the slides** runs the show right in the page. Everything is saved in your browser; **Save setup file** / **Load setup file** back it up.
+
+"Preview with demo data" fills everything with fake results.
 
 ## Presenting
 
@@ -23,57 +46,49 @@ Everything is saved in your browser, so you can close the page and come back. "S
 | `→` `Space` `Enter` / click | next step or slide |
 | `←` `Backspace` | back |
 | `F` | fullscreen |
-| `E` | back to setup |
+| `X` (or the 🧮 button) | **What if…?** — interactive table, see below |
 | `1`–`9`, `0` | jump to slide |
+| `E` | back to setup (preview only) |
 
-Each slide reveals its content in steps, and the last slide (the winner) is a two-step drum-roll: kabab number first, then the restaurant.
+### What if…? (alternative results)
 
-## Fair play for the organisers: private numbering
+Press `X` at any time. Every guest is a chip; untick people to see the final table recomputed without them (rank, average score, price guesses, and ▲▼ change versus everyone). It says whether the winner changes. "Everyone / Nobody / Invert" are shortcuts. Nothing is saved; close it with `X` / `Esc`.
 
-Guests whose plates were numbered differently (Amirabbas and Mina) are ticked in the **Private numbering** section (names containing "Amirabbas" / "Mina" are pre-ticked). Your friend only needs to know **their number → our number**; restaurant names are never shown to them.
-
-1. Finish everything else on the setup page (survey files, restaurant key, prices).
-2. Click **Hand over to your friend**. The page switches to a clean screen showing only kabab numbers — no restaurant names, results, prices or guesses. The setup page is removed from the page while it is open.
-3. Your friend either picks, for each number on *their* plates, the matching number on *our* plates (each once), or uploads a 2-column Excel/CSV file (their number · our number). They review it and click **Lock it in**. Nothing is shown back.
-4. The setup page then only says "Private numbering received (hidden)". The app combines it with your key (our number → restaurant), scores Amirabbas' and Mina's guesses against *their* numbering, and counts their ratings and prices toward the restaurant they actually ate.
-
-The private numbering is **not** included in "Save setup file", so a backup can't leak it. (If you reload the page mid-way, you land back on the setup page.)
-
-## Uploading everything straight into the app
-
-Everything is uploaded in the web page; nothing needs to be sent anywhere else, and no data leaves your computer.
-
-* Survey 1 and survey 2: the two Excel exports (section 2).
-* Restaurant key (optional, section 3): an Excel/CSV with columns `kabab number · restaurant · price`, e.g. `1, Persian Plate, 18`. Or fill the table by hand.
-* Private numbering: typed by your friend, or an Excel/CSV with `their number · our number`.
-* Pictures and logos: the labelled upload boxes.
-
-## The 10 slides
+## The 14 slides
 
 1. Welcome and headline numbers
-2. **Hype Ranking**: best / worst perceived before eating
-3. **Popularity Contest**: least / most popular, most divisive, cult favorite, most #1 votes, crowd favorite
-4. **Mistaken Identity**: the real restaurant behind each number, overall accuracy vs chance, decoys, hardest / easiest kabab, biggest mix-up
-5. **Taste Detectives**: most accurate guests podium, wooden spoon, loyalty test, harshest / most generous critic
-6. **The Price is Right**: guessed vs real prices, best price guesser, steal of the night, sticker shock, big spender
-7. **Hype vs Reality**: most anticipated, underperformer, underdog, most underrated, heartbreak and pleasant-surprise moments
-8. **Bang for the Buck**: taste points per $ of menu price — worst and best value (ratings themselves stay hidden)
-9. **The Countdown**: places last → 2nd (the #1 slot stays locked)
-10. **The Winner** 👑
+2. **Hype Ranking** — best / worst perceived before eating
+3. **Popularity Contest** — least / most popular, most divisive, cult favorite, most #1 votes, crowd favorite
+4. **Mistaken Identity** — the real restaurant behind each number, accuracy vs chance, decoys, hardest / easiest, biggest mix-up
+5. **Taste Detectives** — podium, wooden spoon, loyalty test, harshest / most generous
+6. **Guest Leaderboards** — everyone ranked: best detectives, best price guessers, harshest → most generous
+7. **The Price is Right** — guessed vs real prices, best guesser, steal of the night, sticker shock, big spender
+8. **Plot Twists** — halo effect, does experience help, taste twins & opposites, wisdom of the crowd, money talks, the usual suspect
+9. **The Table** — last place up to 2nd; **the top 3 stay hidden until their turn**, #1 stays locked
+10. **Hype vs Reality** — most anticipated, underperformer, underdog, most underrated, heartbreaks
+11. **Bang for the Buck** — taste points per $ (worst / best value)
+12. **Everyone's Favorite** — each guest's highest-scored kabab
+13. **The Popular Vote** — favorites and least favorites tally
+14. **The Winner** 👑 — drum-roll, kabab number, then the restaurant, with confetti
 
-Slides 7–8 never reveal the #1 kabab (slide 7 shows "revealed at the end" instead of its finish position).
+Slides 1–8 show nothing about how any kabab scored, so the top 3 are only revealed on the table. From slide 9 on, the champion is masked as "🔒 The champion" until the final slide.
+
+## Private numbering (optional)
+
+If some guests (e.g. the organisers) were served with a *different* plate numbering, tick them in **Private numbering**. A friend who knows "their number → our number" (no restaurant names needed) opens the hand-over screen, enters it by hand or uploads a 2-column file, and locks it in. Those guests' guesses are then scored against *their* numbering and their ratings count toward the restaurant they actually ate. It is **off by default** and unused for this event.
+
+The private numbering is stored in saved setup files only "sealed" (base64, not encryption), and `build.js` applies it automatically. Don't open the files before the event if you must not know it.
 
 ## Expected file format
 
 Microsoft Forms exports: columns `ID, Start time, Completion time, Email, Name`, then the guest's typed name.
 
 * **Survey 1**: a ranking column (restaurants separated by `;`, best first) and one optional 1–10 column per restaurant (empty = not tried).
-* **Survey 2**: for each kabab number, a guess column, a rating column (header contains `امتیاز`/"rating") and a price column (header contains `قیمت`/"price"). The kabab number is read from the header (Persian digits work).
+* **Survey 2**: per kabab number a guess column, a rating column (header contains `امتیاز`/"rating") and a price column (header contains `قیمت`/"price"). The number is read from the header (Persian digits work).
 
-Duplicate submissions from the same name are merged (latest wins). Persian names are fully supported.
+Duplicate submissions from the same name are merged (latest wins). Persian names are fully supported. Winner = highest average blind rating; ties are shown as `4=` and broken by what guests would pay.
 
 ## Notes
 
-* Prices are plain numbers shown with a `$` (you can change the symbol).
-* Ratings per restaurant are average blind scores; the winner is the highest average (ties broken by what guests would pay).
-* Libraries and fonts are bundled in `vendor/` and `fonts/` (SheetJS, Outfit, Playfair Display, Vazirmatn), so it works offline.
+* Libraries and fonts are bundled (`vendor/`, `fonts/`: SheetJS, Outfit, Playfair Display, Vazirmatn), so everything works offline.
+* The published `index.html` contains the guests' names and responses; it is public once on GitHub Pages.

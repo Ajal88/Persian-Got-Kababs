@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kabab Showdown Studio · Setup</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main id="setup"></main>
+  <main id="friend" hidden></main>
+
+  <div id="present" hidden>
+    <div id="stage" class="stage">
+      <div class="bg"><i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="grain"></i></div>
+      <div id="slides"></div>
+      <canvas id="confetti"></canvas>
+    </div>
+    <div class="ui-bar">
+      <button data-act="setup" title="Back to setup (E)">⚙ Setup</button>
+      <button data-act="prev" title="Back (←)">‹</button>
+      <span id="counter"></span>
+      <button data-act="next" title="Next (→)">›</button>
+      <button data-act="whatif" title="What if… exclude guests (X)">🧮 What if…</button>
+      <button data-act="fs" title="Fullscreen (F)">⛶</button>
+    </div>
+    <nav id="dots"></nav>
+    <div id="progress"><i></i></div>
+  </div>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="js/analytics.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/parse.js"></script>
+  <script src="js/reconcile.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/slides.js"></script>
+  <script src="js/friend.js"></script>
+  <script src="js/present.js"></script>
+  <script src="js/setup.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

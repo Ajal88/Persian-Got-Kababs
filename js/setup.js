@@ -4,9 +4,8 @@
   const KA = root.KA, P = root.KAParse, Store = root.KAStore;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  const RC = root.KAReconcile, newId = RC.newId;
   const Setup = { state: null, onStart: null, el: null };
-  let uid = 1;
-  const newId = () => 'x' + Date.now().toString(36) + (uid++);
 
   function blank() {
     return {
@@ -52,56 +51,12 @@
   }
 
   /* ----- reconcile names after upload ----- */
-  function syncRestaurants() {
-    const s = Setup.state; if (!s.raw1) return;
-    const have = new Map(s.restaurants.map((r) => [KA.normRestaurant(r.name), r]));
-    s.raw1.restaurants.forEach((name) => {
-      if (!have.has(KA.normRestaurant(name))) {
-        const r = { id: newId(), name, present: false, kabab: null, price: null };
-        s.restaurants.push(r); have.set(KA.normRestaurant(name), r);
-      }
-    });
-  }
+  const syncRestaurants = () => RC.syncRestaurants(Setup.state);
+  const reconcileGuesses = () => RC.reconcileGuesses(Setup.state);
+  const linkPeople = () => { RC.linkPeople(Setup.state); RC.prune(Setup.state); };
 
-  function reconcileGuesses() {
-    const s = Setup.state; if (!s.raw2) return;
-    const exact = new Set(s.restaurants.map((r) => KA.normRestaurant(r.name)));
-    const seen = new Map();
-    s.raw2.rows.forEach((row) => Object.values(row.k).forEach((c) => {
-      if (!c.guess) return; const n = KA.normRestaurant(c.guess);
-      if (!seen.has(n)) seen.set(n, { raw: c.guess, n: 0 }); seen.get(n).n++;
-    }));
-    seen.forEach((v, n) => {
-      if (exact.has(n) || s.nameAliases[n]) return;
-      const m = KA.bestMatch(v.raw, s.restaurants);
-      if (m) s.nameAliases[n] = m.id;
-      else { const r = { id: newId(), name: v.raw, present: false, kabab: null, price: null }; s.restaurants.push(r); s.nameAliases[n] = r.id; exact.add(n); }
-    });
-  }
-
-  function suggestPrivate() {
-    const s = Setup.state; if (!s.raw2 || s.privateGuests) return;
-    const names = [...new Set(s.raw2.rows.map((r) => KA.normName(r.name)))];
-    s.privateGuests = names.filter((n) => /^(amir ?abbas|amirabas|mina|امیر ?عباس|مینا)\b/.test(n));
-  }
-
-  function linkPeople() {
-    const s = Setup.state; if (!s.raw1 || !s.raw2) return;
-    const s1 = new Map(); s.raw1.rows.forEach((r) => s1.set(KA.normName(r.name), r.name));
-    s.raw2.rows.forEach((r) => {
-      const n = KA.normName(r.name);
-      if (s1.has(n) || s.personLinks[n] !== undefined) return;
-      let best = null, bd = 99;
-      s1.forEach((_, k) => { const d = KA.levenshtein(n, k); if (d < bd) { bd = d; best = k; } });
-      if (best && bd <= Math.max(1, Math.floor(Math.min(n.length, best.length) / 5))) s.personLinks[n] = best;
-      else s.personLinks[n] = null;
-    });
-  }
-
-  function autoAssign() {
-    const s = Setup.state; if (!s.raw2) return;
-    // prefer guessing-based hints: nothing. Just keep what the user set.
-  }
+  // Private numbering is opt-in: nobody is selected unless the organiser ticks them.
+  function suggestPrivate() { const s = Setup.state; if (!s.privateGuests) s.privateGuests = []; }
 
   /* ----- actions ----- */
   async function loadKey(file) {
@@ -268,11 +223,17 @@
         <div class="imgrow wrap">${nos.map((n) => imgBox('kabab-' + n, 'Kabab #' + n, 'Photo of this plate')).join('')}</div>
       </section>` : ''}
 
+      <section class="card">
+        <h3><span class="n">7</span> Publish</h3>
+        <p class="help" style="margin-top:0">The slides live in <code>index.html</code>. Download it and put it in the repository next to <code>css/</code>, <code>js/</code> and <code>fonts/</code> (it embeds your data and pictures), or save the setup file and run <code>node build.js</code> to regenerate <code>index.html</code> automatically. Either way it works on GitHub Pages.</p>
+        <button class="btn primary" id="publish" ${errors.length ? 'disabled' : ''}>⬇ Download index.html</button>
+      </section>
+
       <footer class="launch">
         ${errors.length ? `<ul class="issues err">${errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
         ${warns.length ? `<ul class="issues warn">${warns.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
         <div class="launch-row">
-          <button class="btn primary big" id="start" ${errors.length ? 'disabled' : ''}>🔥 Start the presentation</button>
+          <button class="btn primary big" id="start" ${errors.length ? 'disabled' : ''}>👁 Preview the slides</button>
           <div class="launch-aux">
             <button class="btn ghost small" id="export">Save setup file</button>
             <label class="btn ghost small">Load setup file<input type="file" accept=".json" id="import" hidden></label>
@@ -313,6 +274,7 @@
       const s = Setup.state;
       if (t.id === 'start' && !t.disabled) { save(); Setup.onStart(); }
       else if (t.id === 'demo') loadDemo();
+      else if (t.id === 'publish' && !t.disabled) publish();
       else if (t.id === 'friendBtn') { save(); Setup.onFriend(); }
       else if (t.id === 'addRest') { s.restaurants.push({ id: newId(), name: 'New restaurant', present: false, kabab: null, price: null }); save(); render(); }
       else if (t.dataset.rm) { s.restaurants = s.restaurants.filter((r) => r.id !== t.dataset.rm); save(); render(); }
@@ -331,14 +293,20 @@
     });
   }
 
+  function publish() {
+    const st = Setup.state;
+    const html = root.KAExport.buildIndex({ cfg: st.cfg, resolved: Setup.resolved(), images: st.images });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' })); a.download = 'index.html'; a.click();
+  }
+
   function exportSetup() {
-    const copy = Object.assign({}, Setup.state, { privateMap: null }); // keep the private numbering secret
+    const copy = Object.assign({}, Setup.state, { privateMap: null, privateSealed: RC.seal(Setup.state.privateMap) }); // not human-readable at a glance
     const blob = new Blob([JSON.stringify(copy)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'kabab-showdown-setup.json'; a.click();
   }
   function importSetup(file) {
     if (!file) return;
-    file.text().then((t) => { try { Setup.state = Object.assign(blank(), JSON.parse(t), { privateMap: Setup.state.privateMap }); save(); render(); } catch (e) { alert('That file is not a valid setup file.'); } });
+    file.text().then((t) => { try { const j = JSON.parse(t); Setup.state = Object.assign(blank(), j, { privateMap: RC.unseal(j.privateSealed) || Setup.state.privateMap }); delete Setup.state.privateSealed; save(); render(); } catch (e) { alert('That file is not a valid setup file.'); } });
   }
 
   Setup.init = async function (el, onStart, onFriend) {

@@ -1,0 +1,32 @@
+name: Build slides
+
+# Regenerates index.html whenever the setup, the survey files or the slide code change.
+on:
+  push:
+    branches: [main]
+    paths:
+      - kabab-showdown-setup.json
+      - data/**
+      - js/**
+      - css/**
+      - build.js
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node build.js
+      - name: Commit regenerated slides
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html assets
+          git diff --cached --quiet || (git commit -m "Rebuild slides" && git push)
