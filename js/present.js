@@ -5,7 +5,7 @@
   'use strict';
   const KA = root.KA, Slides = root.KASlides.slides;
   const $ = (s) => document.querySelector(s);
-  let presEl, stage, slideHost, resolvedData = null, wiOpen = false, wiExcluded = new Set(), deck = [], idx = 0, step = 0, analysis = null, ctx = null, hideTimer = null, active = false, onExit = null, bound = false;
+  let presEl, stage, slideHost, resolvedData = null, biOpen = false, wiOpen = false, wiExcluded = new Set(), deck = [], idx = 0, step = 0, analysis = null, ctx = null, hideTimer = null, active = false, onExit = null, bound = false;
 
   function fit() { stage.style.setProperty('--s', Math.min(innerWidth / 1920, innerHeight / 1080)); }
 
@@ -67,7 +67,7 @@
   /* ---------- interactive "What if…?" table ---------- */
   function wiRender() {
     const K = root.KASlides, H = K.helpers, nm = K.nm;
-    let box = stage.querySelector('.wi');
+    let box = stage.querySelector('.wi:not(.bi)');
     if (!box) { box = document.createElement('div'); box.className = 'wi'; stage.appendChild(box); }
     const all = resolvedData.s2;
     const keep = (p) => !wiExcluded.has(p.pid);
@@ -96,8 +96,8 @@
   }
   function wiToggle(force) {
     wiOpen = force == null ? !wiOpen : force;
-    let box = stage.querySelector('.wi');
-    if (wiOpen) { wiRender(); box = stage.querySelector('.wi'); requestAnimationFrame(() => box.classList.add('open')); }
+    let box = stage.querySelector('.wi:not(.bi)');
+    if (wiOpen) { wiRender(); box = stage.querySelector('.wi:not(.bi)'); requestAnimationFrame(() => box.classList.add('open')); }
     else if (box) box.classList.remove('open');
   }
   function wiClick(e) {
@@ -111,7 +111,57 @@
       wiRender(); wiStay();
     }
   }
-  const wiStay = () => { const b = stage.querySelector('.wi'); if (b) b.classList.add('open'); };
+  const wiStay = () => { const b = stage.querySelector('.wi:not(.bi)'); if (b) b.classList.add('open'); };
+
+  /* ---------- backup page: prior-experience bias check (key B) ---------- */
+  function biRender() {
+    const K = root.KASlides, H = K.helpers, nm = K.nm, esc = K.esc;
+    let box = stage.querySelector('.bi');
+    if (!box) { box = document.createElement('div'); box.className = 'wi bi'; stage.appendChild(box); }
+    const b = analysis.bias, fmt = (x, d = 2) => (x == null ? '–' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(d));
+    const head = (extra) => `<div class="wi-head"><div><div class="eyebrow"><i></i>Backup page · not part of the show</div><h2>Bias <em>check</em></h2>
+      <p class="sub">Did liking a restaurant <i>before</i> the party inflate the score of its blind kabab?</p></div>
+      <button class="wi-close" data-bi="close">✕ Close <small>(B / Esc)</small></button></div>${extra || ''}`;
+    if (!b) { box.innerHTML = head('<div class="nodata" style="margin-top:120px">Not enough guests who rated a restaurant before <i>and</i> its kabab.</div>'); return; }
+    const h = H(analysis, ctx);
+    // scatter: prior opinion (x) vs blind score (y)
+    const W = 720, Hh = 350, L = 56, T = 16, R = 16, B = 52, X = (v) => L + ((v - 0.5) / 10) * (W - L - R), Y = (v) => Hh - B - ((v - 0.5) / 10) * (Hh - T - B);
+    let grid = ''; for (let v = 2; v <= 10; v += 2) grid += `<line class="bi-grid" x1="${X(v)}" y1="${T}" x2="${X(v)}" y2="${Hh - B}"/><line class="bi-grid" x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}"/><text class="bi-tick" x="${X(v)}" y="${Hh - B + 22}" text-anchor="middle">${v}</text><text class="bi-tick" x="${L - 12}" y="${Y(v) + 6}" text-anchor="end">${v}</text>`;
+    const pts = b.points.map((q, i) => { const jx = (((i * 37) % 11) - 5) / 24, jy = (((i * 53) % 13) - 6) / 28; return `<circle class="bi-pt ${q.rec ? 'rec' : ''}" cx="${X(q.pre + jx).toFixed(1)}" cy="${Y(q.post + jy).toFixed(1)}" r="${q.rec ? 9 : 7.5}"><title>${esc(q.name)}: before ${q.pre}, blind ${q.post}</title></circle>`; }).join('');
+    const line = b.slope == null ? '' : `<line class="bi-fit" x1="${X(1)}" y1="${Y(b.intercept + b.slope * 1)}" x2="${X(10)}" y2="${Y(b.intercept + b.slope * 10)}"/>`;
+    const plot = `<svg viewBox="0 0 ${W} ${Hh}" class="bi-svg">${grid}<line class="bi-diag" x1="${X(0.5)}" y1="${Y(0.5)}" x2="${X(10.5)}" y2="${Y(10.5)}"/>${line}${pts}
+      <text class="bi-axis" x="${(L + W - R) / 2}" y="${Hh - 8}" text-anchor="middle">Rating of the restaurant BEFORE the party</text>
+      <text class="bi-axis" transform="translate(16 ${(T + Hh - B) / 2}) rotate(-90)" text-anchor="middle">Blind rating of its kabab</text></svg>`;
+    const lo = b.ci[0], hi = b.ci[1];
+    const verdict = b.sig && b.beta > 0 ? `<b>Evidence of bias.</b> Guests scored kababs from restaurants they already liked higher.` : b.sig ? `<b>Reverse effect.</b> Guests scored kababs from restaurants they liked <i>lower</i>.` : `<b>No clear bias.</b> The confidence interval includes zero.`;
+    const sub = (t, label) => (t.beta == null ? `${label} <b>n=${t.n}</b>: too few to estimate` : `${label} <b>n=${t.n}</b>: ${fmt(t.beta)}`);
+    const cols = [['raw', 'As scored'], ['adj', 'Bias-adjusted'], ['naive', 'First-timers only']].map(([key, title]) => {
+      const rows = b.table.filter((x) => x[key] != null).sort((x, y) => (x[key + 'Pos'] - y[key + 'Pos']) || (y[key] - x[key]));
+      const li = rows.map((x) => { const d = key === 'raw' ? 0 : x.rawPos - x[key + 'Pos'];
+        return `<li class="${x[key + 'Pos'] === 1 ? 'first' : ''}"><span class="bi-pos">${x[key + 'Pos']}</span><span class="bi-nm">${nm(x.name)}</span><span class="bi-sc">${x[key].toFixed(2)}${key === 'naive' ? `<small> n=${x.naiveN}</small>` : ''}</span><span class="bi-d ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d > 0 ? '▲' + d : d < 0 ? '▼' + (-d) : '·'}</span></li>`; }).join('');
+      return `<div class="bi-col"><div class="bi-col-t">${title}</div><ol>${li}</ol></div>`;
+    }).join('');
+    const hold = (ok, yes, no) => (ok == null ? '' : `<span class="${ok ? 'ok' : 'warn'}">${ok ? '✓' : '⚠'} ${ok ? yes : no}</span>`);
+    box.innerHTML = head(`<div class="bi-body">
+      <div class="bi-plotcard"><div class="kicker">Prior opinion vs blind score <small><b style="color:var(--teal)">●</b> recognised the plate · <b style="color:var(--ember)">●</b> did not · dashed = same score before and after</small></div>${plot}</div>
+      <div class="bi-cards">
+        <div class="bi-card"><div class="kicker">🔬 Bias strength</div><div class="bi-big">${fmt(b.beta)}<small> pts per +1 of prior opinion</small></div>
+          <div class="bi-txt">95% CI <b>${fmt(lo)}</b> to <b>${fmt(hi)}</b> · ${b.n} pairs from ${b.nGuests} guests<br>${verdict}</div></div>
+        <div class="bi-card"><div class="kicker">🧠 Is it “I knew it was my favorite”?</div><div class="bi-txt">${sub(b.rec, 'Recognised the plate')}<br>${sub(b.unrec, 'Did not recognise it')}<br><span class="bi-dim">Pure bias from knowing would be strongest when they recognised it.</span></div></div>
+        <div class="bi-card"><div class="kicker">🛠 Correction applied</div><div class="bi-txt">${b.applied > 0 ? `Each score by a guest who had rated the restaurant before was reduced by <b>${b.applied.toFixed(2)} × (their prior − average prior)</b>.` : '<b>None needed</b> — no positive bias was found, so the adjusted table equals the raw one.'}</div></div>
+      </div></div>
+      <div class="bi-tables">${cols}</div>
+      <div class="bi-foot">${hold(b.winnerHoldsAdj, 'Same winner after adjustment', 'The winner changes after adjustment')} ${hold(b.winnerHoldsNaive, 'Same winner among first-timers', 'Among first-timers only, the leader differs — but with very few tasters per restaurant this is noise, not evidence')}</div>
+      <div class="bi-method">Method: blind score ~ prior opinion, with guest and restaurant fixed effects (removes personal generosity and true restaurant quality), 95% CI from 400 bootstrap resamples of guests. The adjustment subtracts the estimated effect (never below 0) from scores by guests who had rated the restaurant before; “first-timers” are guests who had not rated it before the party.</div>`);
+  }
+  function overlayToggle(kind, force) {
+    const other = kind === 'wi' ? 'bi' : 'wi';
+    if (other === 'bi' ? biOpen : wiOpen) overlayToggle(other, false);
+    const open = force == null ? !(kind === 'wi' ? wiOpen : biOpen) : force;
+    if (kind === 'wi') { wiToggle(open); return; }
+    biOpen = open; let box = stage.querySelector('.bi');
+    if (open) { biRender(); box = stage.querySelector('.bi'); requestAnimationFrame(() => box.classList.add('open')); } else if (box) box.classList.remove('open');
+  }
 
   function bind() {
     if (bound) return; bound = true;
@@ -119,8 +169,9 @@
     addEventListener('keydown', (e) => {
       if (!active || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key;
-      if (k === 'x' || k === 'X') { wiToggle(); wakeUi(); return; }
-      if (wiOpen) { if (k === 'Escape') wiToggle(false); return; }
+      if (k === 'x' || k === 'X') { overlayToggle('wi'); wakeUi(); return; }
+      if (k === 'b' || k === 'B') { overlayToggle('bi'); wakeUi(); return; }
+      if (wiOpen || biOpen) { if (k === 'Escape') { overlayToggle(wiOpen ? 'wi' : 'bi', false); } return; }
       if (['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter'].includes(k)) { e.preventDefault(); next(); }
       else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); prev(); }
       else if (k === 'Home') show(0); else if (k === 'End') show(deck.length - 1);
@@ -131,10 +182,11 @@
     });
     presEl.addEventListener('mousemove', wakeUi);
     presEl.addEventListener('click', (e) => {
+      if (e.target.closest('.bi')) { if (e.target.closest('[data-bi]')) overlayToggle('bi', false); return; }
       if (e.target.closest('.wi')) { wiClick(e); return; }
       const g = e.target.closest('[data-go]'); if (g) { show(+g.dataset.go); return; }
       const b = e.target.closest('[data-act]');
-      if (b) { ({ next, prev, setup: exit, fs: toggleFs, whatif: () => wiToggle() })[b.dataset.act](); return; }
+      if (b) { ({ next, prev, setup: exit, fs: toggleFs, whatif: () => overlayToggle('wi'), bias: () => overlayToggle('bi') })[b.dataset.act](); return; }
       if (e.target.closest('.ui-bar')) return;
       next();
     });
@@ -148,7 +200,7 @@
     presEl = $('#present'); stage = $('#stage'); slideHost = $('#slides');
     onExit = opts.onExit || null;
     presEl.classList.toggle('no-exit', !onExit);
-    resolvedData = opts.resolved; wiOpen = false; wiExcluded = new Set(); const old = stage.querySelector('.wi'); if (old) old.remove();
+    resolvedData = opts.resolved; wiOpen = false; biOpen = false; const oldB = stage.querySelector('.bi'); if (oldB) oldB.remove(); wiExcluded = new Set(); const old = stage.querySelector('.wi:not(.bi)'); if (old) old.remove();
     analysis = KA.analyze(opts.resolved);
     const imgs = opts.images || {};
     ctx = { cfg: opts.cfg, img: (k) => imgs[k] || null };

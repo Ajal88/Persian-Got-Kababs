@@ -47,12 +47,23 @@ Pick whichever is easiest:
 | `←` `Backspace` | back |
 | `F` | fullscreen |
 | `X` (or the 🧮 button) | **What if…?** — interactive table, see below |
+| `B` (or the 🔬 button) | **Bias check** — backup page, see below |
 | `1`–`9`, `0` | jump to slide |
 | `E` | back to setup (preview only) |
 
 ### What if…? (alternative results)
 
 Press `X` at any time. Every guest is a chip; untick people to see the final table recomputed without them (rank, average score, price guesses, and ▲▼ change versus everyone). It says whether the winner changes. "Everyone / Nobody / Invert" are shortcuts. Nothing is saved; close it with `X` / `Esc`.
+
+### Bias check (backup page, key `B`)
+
+Not one of the 15 slides, so it never distracts the audience — open it only if someone asks "isn't that biased?". It tests whether guests who already liked a restaurant scored its blind kabab higher because of that:
+
+* **Plot**: each dot is one guest × restaurant they had rated before the party (x = prior rating, y = blind rating; teal = they recognised the plate).
+* **Estimate**: score ~ prior opinion with **guest and restaurant fixed effects** (removes personal generosity and the restaurant's real quality), with a 95% confidence interval from 400 bootstrap resamples of guests. A split shows whether the effect appears only when they recognised the plate.
+* **Workarounds**: *Bias-adjusted* subtracts the estimated effect (never below 0) from the scores of guests who had rated the restaurant before; *First-timers only* keeps just guests who had never rated that restaurant. Rank changes versus the raw table are shown, plus whether the winner holds.
+
+For this event the effect is −0.16 points per +1 of prior opinion (95% CI −0.63 to +0.03): no clear bias, so the adjusted table equals the raw one. Among first-timers only, Pardis leads Caspian, but with ~6 tasters per restaurant that is noise. The Table slide carries a small "🔬 checked for bias" footnote.
 
 ## The 15 slides
 

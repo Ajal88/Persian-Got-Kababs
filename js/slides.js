@@ -513,7 +513,8 @@
             <span class="cd-price"><small>guessed / real</small>${H.money(k.avgPrice)} <i>/</i> ${H.money(k.actualPrice)}</span></div></div>`;
       });
       return `${head('The verdict', 'The <em>Table</em>', 'Average blind rating out of 10 — from last place up. The top 3 stay hidden until their turn.')}
-      <div class="countdown">${rows.join('')}</div>`;
+      <div class="countdown">${rows.join('')}</div>
+      ${a.bias ? '<div class="bias-note" data-step="' + Math.max(1, N - 1) + '">🔬 Checked for prior-experience bias — backup page on <kbd>B</kbd></div>' : ''}`;
     },
   });
 

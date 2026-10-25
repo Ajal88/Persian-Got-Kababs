@@ -335,7 +335,7 @@
         const pre1 = s1.rating[e.id]; if (pre1 == null) return;
         const s2 = d.s2.find((x) => x.pid === s1.pid); if (!s2) return;
         const c = s2.k[kabNoFor(s2, e.id)]; if (!c || c.rating == null) return;
-        pairs.push({ name: s1.name, restaurant: e.name, kabab: e.kabab, pre: pre1, post: c.rating, diff: c.rating - pre1, recognised: c.guess === e.id });
+        pairs.push({ pid: s1.pid, rid: e.id, name: s1.name, restaurant: e.name, kabab: e.kabab, pre: pre1, post: c.rating, diff: c.rating - pre1, recognised: c.guess === e.id });
       });
     });
     out.pairs = pairs;
@@ -473,6 +473,60 @@
     out.polarising = extremes(kabs.filter((k) => k.ratingStd != null), (k) => k.ratingStd, 'max');
     out.unanimous = extremes(kabs.filter((k) => k.ratingStd != null), (k) => k.ratingStd, 'min');
     out.invisible = extremes(guessRows.filter((x) => x.present), (x) => x.n, 'min');
+    /* ===== prior-experience bias check =====
+     * Question: do guests score a blind kabab higher *because* they already liked the restaurant?
+     * Pairs = (guest, restaurant) where the guest rated the restaurant before the party and the kabab blind.
+     * Estimate: blind ~ prior with guest and restaurant fixed effects (two-way demeaning), so general generosity and
+     * real restaurant quality are removed; the slope is the pure "prior opinion -> score" effect. 95% CI by bootstrapping guests. */
+    (function () {
+      const P = pairs;
+      const twoWay = (rows) => {
+        if (rows.length < 6) return null;
+        let b = rows.map((r) => r.post), p = rows.map((r) => r.pre);
+        const dm = (v, key) => { const g = {}; rows.forEach((r, i) => { (g[r[key]] = g[r[key]] || []).push(i); }); Object.values(g).forEach((ix) => { const m = ix.reduce((acc, i) => acc + v[i], 0) / ix.length; ix.forEach((i) => { v[i] -= m; }); }); };
+        for (let it = 0; it < 60; it++) { dm(b, 'pid'); dm(b, 'rid'); dm(p, 'pid'); dm(p, 'rid'); }
+        const sxx = p.reduce((acc, x) => acc + x * x, 0); if (sxx < 1e-9) return null;
+        return p.reduce((acc, x, i) => acc + x * b[i], 0) / sxx;
+      };
+      const beta = twoWay(P);
+      if (beta == null) { out.bias = null; return; }
+      // bootstrap over guests
+      let seed = 12345; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      const gids = [...new Set(P.map((x) => x.pid))], boots = [];
+      for (let t = 0; t < 400; t++) {
+        const rows = [];
+        gids.forEach((_, k) => { const g = gids[Math.floor(rnd() * gids.length)]; P.filter((x) => x.pid === g).forEach((x) => rows.push(Object.assign({}, x, { pid: g + '#' + k }))); });
+        const bb = twoWay(rows); if (bb != null) boots.push(bb);
+      }
+      boots.sort((x, y) => x - y);
+      const q = (f) => (boots.length ? boots[Math.min(boots.length - 1, Math.floor(f * boots.length))] : null);
+      const ci = [q(0.025), q(0.975)];
+      const sub = (flag) => { const rows = P.filter((x) => x.recognised === flag); return { n: rows.length, beta: rows.length >= 8 ? twoWay(rows) : null }; };
+      const pbar = mean(P.map((x) => x.pre)), bc = Math.max(0, beta);
+      // adjusted & first-timer tables (every blind rating counts once)
+      const s1 = d.s1;
+      const rowsFor = (r) => cells.filter((c) => c.truth === r.id && c.rating != null).map((c) => {
+        const pr = (s1ByPid[c.pid] || { rating: {} }).rating[r.id];
+        return { post: c.rating, pre: pr == null ? null : pr };
+      });
+      const tbl = present.map((r) => {
+        const rs = rowsFor(r), fresh = rs.filter((x) => x.pre == null);
+        return { id: r.id, name: r.name, raw: mean(rs.map((x) => x.post)), adj: mean(rs.map((x) => (x.pre == null ? x.post : x.post - bc * (x.pre - pbar)))), naive: mean(fresh.map((x) => x.post)), naiveN: fresh.length, nPrior: rs.length - fresh.length };
+      });
+      const place = (key) => { const o = tbl.filter((x) => x[key] != null).sort((x, y) => y[key] - x[key]); o.forEach((x, i) => { x[key + 'Pos'] = i > 0 && Math.abs(o[i - 1][key] - x[key]) < 1e-9 ? o[i - 1][key + 'Pos'] : i + 1; }); };
+      ['raw', 'adj', 'naive'].forEach(place);
+      const top = (key) => tbl.filter((x) => x[key + 'Pos'] === 1).map((x) => x.id).sort().join();
+      const rawXs = P.map((x) => x.pre), rawYs = P.map((x) => x.post), mx = mean(rawXs), my = mean(rawYs);
+      const sxx = rawXs.reduce((acc, x) => acc + (x - mx) ** 2, 0);
+      const slope = sxx ? rawXs.reduce((acc, x, i) => acc + (x - mx) * (rawYs[i] - my), 0) / sxx : null;
+      out.bias = {
+        n: P.length, nGuests: gids.length, beta, ci, rRaw: pearson(rawXs, rawYs), slope, intercept: slope == null ? null : my - slope * mx,
+        rec: sub(true), unrec: sub(false), pbar, applied: bc, table: tbl,
+        sig: ci[0] != null && (ci[0] > 0 || ci[1] < 0),
+        winnerHoldsAdj: top('raw') === top('adj'), winnerHoldsNaive: tbl.some((x) => x.naivePos != null) ? top('raw') === top('naive') : null,
+        points: P.map((x) => ({ pre: x.pre, post: x.post, rec: x.recognised, name: x.name })),
+      };
+    })();
     out.matchedPeople = d.s2.filter((p) => d.s1.some((q) => q.pid === p.pid)).length;
     return out;
   }

@@ -306,7 +306,7 @@
   }
   function importSetup(file) {
     if (!file) return;
-    file.text().then((t) => { try { const j = JSON.parse(t); Setup.state = Object.assign(blank(), j, { privateMap: RC.unseal(j.privateSealed) || Setup.state.privateMap }); delete Setup.state.privateSealed; save(); render(); } catch (e) { alert('That file is not a valid setup file.'); } });
+    file.text().then((t) => { try { const j = JSON.parse(t); Setup.state = Object.assign(blank(), j, { privateMap: RC.unseal(j.privateSealed) || Setup.state.privateMap }); delete Setup.state.privateSealed; RC.prune(Setup.state); save(); render(); } catch (e) { alert('That file is not a valid setup file.'); } });
   }
 
   Setup.init = async function (el, onStart, onFriend) {
@@ -319,6 +319,6 @@
   Setup.render = render;
   Setup.save = () => Store.set('state', Setup.state);
   Setup.validate = validate;
-  Setup.resolved = () => { const s = Setup.state; return KA.resolve(s.raw1, s.raw2, s); };
+  Setup.resolved = () => { const s = Setup.state; RC.prune(s); return KA.resolve(s.raw1, s.raw2, s); }; // drop stale name links first
   root.KASetup = Setup;
 })(window);
